@@ -8,7 +8,7 @@ diagrams. Never draw them manually again!
 This small Python script takes a KiCAD board (.kicad_pcb file) and produces a 2D
 nice looking drawing of the board as an SVG file. This allows you to quickly and
 automatically create awesome pinout diagrams for your project. These diagrams
-are much easier to read than a labeled photo of physical board or an actual
+are much easier to read than a labeled photo of a physical board or an actual
 KiCAD design.
 
 You and your users will love them!
@@ -37,16 +37,16 @@ Usage of PcbDraw is simple, just run:
 
 The script will output several debug messages of KiCAD Python API you can
 ignore. I haven't found a way to disable them. If there is a missing module in
-the library, script will output warning.
+the library, the script will output warning.
 
 There are several options for the script:
 
-- `--list-components` prints a list all components from the front side of PCB.
+- `--list-components` prints a list of all components from the front side of PCB.
   Doesn't produce drawing.
-- `--placeholder` shows a red square in the drawing for a missing modules.
+- `--placeholder` shows a red square in the drawing for missing modules.
 - `--remap` takes a path to a JSON file containing a dictionary from component
   references to alternative modules to change a module for given component. This
-  allows you to e.g. choose a different colors for LEDs without a need to change
+  allows you to e.g. choose different colors for LEDs without a need to change
   original board and create new packages for different colors. Format of
   dictionary entry is `"<ref>": "<library>:<module>"`  - e.g. `"PHOTO1":
   "Resistors:R_PHOTO_7mm"`.
@@ -104,3 +104,4 @@ Feel free to submit issues and pull requests!
 - support value labels on modules
 - maybe supported Eagle boards directly (now you can import them into KiCAD and
   export as kicad_pcb)
+- make module origin more flexible
