@@ -216,9 +216,13 @@ def walk_components(board, export):
             module = module.Next()
             continue
         lib = str(module.GetFPID().GetLibNickname()).strip()
-        name = str(module.GetFPID().GetFootprintName()).strip()
-        value = str(module.GetValue()).strip()
-        ref = str(module.GetReference()).strip()
+        try:
+            name = str(module.GetFPID().GetFootprintName()).strip()
+        except AttributeError:
+            # it seems we are working on Kicad >4.0.6, which has a changed method name
+            name = str(module.GetFPID().GetLibItemName()).strip()
+        value = unicode(module.GetValue()).strip()
+        ref = unicode(module.GetReference()).strip()
         center = module.GetCenter()
         orient = math.radians(module.GetOrientation() / 10)
         pos = (center.x, center.y, orient)
