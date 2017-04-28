@@ -229,25 +229,26 @@ def walk_components(board, export):
         export(lib, name, value, ref, pos)
         module = module.Next()
 
-def get_model_file(path, lib, name, ref, remapping):
+def get_model_file(paths, lib, name, ref, remapping):
     """ Find model file in library considering component remapping """
-    if ref in remapping:
-        lib, name = tuple(remapping[ref].split(":"))
-    f = os.path.join(path, lib, name + ".svg")
-    if not os.path.isfile(f):
-        return None
-    return f
+    for path in paths:
+        if ref in remapping:
+            lib, name = tuple(remapping[ref].split(":"))
+        f = os.path.join(path, lib, name + ".svg")
+        if os.path.isfile(f):
+            return f
+    return None
 
-def print_component(path, lib, name, value, ref, pos, remapping={}):
-    f = get_model_file(path, lib, name, ref, remapping)
+def print_component(paths, lib, name, value, ref, pos, remapping={}):
+    f = get_model_file(paths, lib, name, ref, remapping)
     msg = "{} with package {}:{} at [{},{},{}] -> {}".format(
         ref, lib, name, pos[0], pos[1], math.degrees(pos[2]), f if f else "Not found")
     print(msg)
 
-def component_from_library(parent, path, lib, name, value, ref, pos, placeholder=True, remapping={}):
+def component_from_library(parent, paths, lib, name, value, ref, pos, placeholder=True, remapping={}):
     if not name:
         return
-    f = get_model_file(path, lib, name, ref, remapping)
+    f = get_model_file(paths, lib, name, ref, remapping)
     if not f:
         print("Warning: component '{}' from library '{}' was not found".format(name, lib))
         if placeholder:
@@ -300,7 +301,7 @@ def load_remapping(remap_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("style", help="JSON file with board style")
-    parser.add_argument("library", help="directory containing SVG footprints")
+    parser.add_argument("libraries", help="directories containing SVG footprints")
     parser.add_argument("output", help="destination for final SVG")
     parser.add_argument("board", help=".kicad_pcb file to draw")
     parser.add_argument("-p", "--placeholder", action="store_true",
@@ -311,6 +312,7 @@ if __name__ == "__main__":
                         help="Dry run, just list the components")
 
     args = parser.parse_args()
+    args.libraries = args.libraries.split(',')
     print(args)
 
     try:
@@ -329,7 +331,7 @@ if __name__ == "__main__":
 
     if args.list_components:
         walk_components(board, lambda lib, name, val, ref, pos:
-                        print_component(args.library, lib, name, val, ref, pos,
+                        print_component(args.libraries, lib, name, val, ref, pos,
                                         remapping=remapping))
         sys.exit(0)
 
@@ -343,7 +345,7 @@ if __name__ == "__main__":
 
     wrapper.append(get_board_substrate(board, style))
     walk_components(board, lambda lib, name, val, ref, pos:
-        component_from_library(wrapper, args.library, lib, name, val, ref, pos,
+        component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
                                placeholder=args.placeholder, remapping=remapping))
     document.write(args.output)
 
