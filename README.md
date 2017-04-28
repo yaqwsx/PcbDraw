@@ -26,18 +26,18 @@ separate repository: [PcbDraw-Lib](https://github.com/yaqwsx/PcbDraw-Lib).
 Usage of PcbDraw is simple, just run:
 
 ```.{bash}
-./pcbdraw.py <style> <library> <output_file> <input_file>
+./pcbdraw.py <style> <libraries> <output_file> <input_file>
 ```
 - `style` is a path to a JSON file containing board colours definition. Several
   example styles are in the styles directory.
-- `library` is a path to a directory containing module library. Modules are
+- `libraries` is a comma separated list of paths to directories containing module libraries. Modules are
   component footprints in SVG format.
 - `output_file` is a path to an output SVG file
 - `input_file` is a path to an `*.kicad_pcb` file
 
 The script will output several debug messages of KiCAD Python API you can
 ignore. I haven't found a way to disable them. If there is a missing module in
-the library, the script will output warning.
+the libraries, the script will output warning.
 
 There are several options for the script:
 
