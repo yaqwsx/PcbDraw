@@ -83,6 +83,10 @@ contributions are welcomed! Drawing a single component from scratch takes less
 than 10 minutes, which is not much time. Please, send a pull-request for
 components you have created.
 
+When specifying multiple module libraries, the first library path to match a
+given footprint is used for rendering. The lookup order is the same you
+wrote the `<libraries>` list.
+
 ## Eagle Boards
 
 Boards from Eagle CAD are not supported directly now. You can import an Eagle
