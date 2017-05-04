@@ -165,6 +165,10 @@ def process_board_substrate_layer(container, name, source, colors):
         layer.append(element)
 
 def process_board_substrate_base(container, name, source, colors):
+    clipPath = etree.SubElement(etree.SubElement(container, "defs"), "clipPath")
+    clipPath.attrib["id"] = "cut-off"
+    clipPath.append(get_board_polygon(extract_svg_content(source)))
+
     layer = etree.SubElement(container, "g", id="substrate-"+name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
     layer.append(get_board_polygon(extract_svg_content(source)))
@@ -183,8 +187,10 @@ def get_board_substrate(board, colors):
         ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
         ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
         ("pads", [pcbnew.F_Paste], process_board_substrate_layer),
-        ("silk", [pcbnew.F_SilkS], process_board_substrate_layer)]
+        ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
+        ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
     container = etree.Element('g')
+    container.attrib["clip-path"] = "url(#cut-off)";
     tmp = tempfile.mkdtemp()
     pctl = pcbnew.PLOT_CONTROLLER(board)
     popt = pctl.GetPlotOptions()
