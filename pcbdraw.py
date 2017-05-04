@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
-import sys
-import os
-import shutil
-import pcbnew
-import tempfile
-import re
-import math
-import json
 import argparse
+import json
+import math
+import os
+import re
+import shutil
+import sys
+import tempfile
+
+import pcbnew
 from lxml import etree
+
 
 class SvgPathItem:
     def __init__(self, path):
@@ -68,7 +70,7 @@ def extract_svg_content(filename):
     root = etree.parse(filename).getroot()
     # We have to ensure all Ids in SVG are unique. Let's make it nasty by
     # collecting all ids and doing search & replace
-    # Potetially dangerous (can break user text)
+    # Potentially dangerous (can break user text)
     ids = []
     for el in root.getiterator():
         if "id" in el.attrib and el.attrib["id"] != "origin":
@@ -370,4 +372,3 @@ if __name__ == "__main__":
         component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
                                placeholder=args.placeholder, remapping=remapping))
     document.write(args.output)
-
