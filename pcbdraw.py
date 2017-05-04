@@ -163,7 +163,7 @@ def process_board_substrate_layer(container, name, source, colors):
     layer = etree.SubElement(container, "g", id="substrate-"+name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
     if name == "pads":
-        layer.attrib["clip-path"] = "url(#pads-mask)";
+        layer.attrib["mask"] = "url(#pads-mask)";
     for element in extract_svg_content(source):
         strip_fill_svg(element)
         layer.append(element)
@@ -183,17 +183,14 @@ def process_board_substrate_base(container, name, source, colors):
         outline.append(element)
 
 def process_board_substrate_mask(container, name, source, colors):
-    clipPath = etree.SubElement(etree.SubElement(container, "defs"), "clipPath")
-    clipPath.attrib["id"] = name
+    mask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
+    mask.attrib["id"] = name
     for element in extract_svg_content(source):
-        if element.tag == "g":
-            for item in element:
-                if "style" not in item.attrib:
-                    item.attrib["style"] = ""
-                item.attrib["style"] += " " + element.attrib["style"]
-                clipPath.append(item)
-        else:
-            clipPath.append(element)
+        for item in element.getiterator():
+            if "style" in item.attrib:
+                # KiCAD plots in black, for mask we need white
+                item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff");
+            mask.append(element)
 
 def get_board_substrate(board, colors):
     """
