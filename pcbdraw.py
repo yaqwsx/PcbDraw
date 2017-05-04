@@ -46,7 +46,7 @@ class SvgPathItem:
             ret += " M {} {} ".format(*self.start)
         ret += self.type
         if self.args:
-            ret += " " + " ".join(map(str, self.args))
+            ret += " " + " ".join(map(lambda x: str(x).rstrip('0').rstrip('.'), self.args))
         ret += " {} {} ".format(*self.end)
         return ret
 
