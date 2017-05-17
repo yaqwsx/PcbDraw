@@ -212,6 +212,7 @@ def get_board_substrate(board, colors):
     popt.SetOutputDirectory(tmp)
     popt.SetScale(1)
     popt.SetMirror(False)
+    popt.SetPlotOutlineMode(False)
     popt.SetTextMode(pcbnew.PLOTTEXTMODE_STROKE)
     for f, layers, _ in toPlot:
         pctl.OpenPlotfile(f, pcbnew.PLOT_FORMAT_SVG, f)
