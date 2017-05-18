@@ -212,7 +212,11 @@ def get_board_substrate(board, colors):
     popt.SetOutputDirectory(tmp)
     popt.SetScale(1)
     popt.SetMirror(False)
-    popt.SetPlotOutlineMode(False)
+    try:
+        popt.SetPlotOutlineMode(False)
+    except:
+        # Method does not exist in older versions of KiCad
+        pass
     popt.SetTextMode(pcbnew.PLOTTEXTMODE_STROKE)
     for f, layers, _ in toPlot:
         pctl.OpenPlotfile(f, pcbnew.PLOT_FORMAT_SVG, f)
