@@ -50,6 +50,7 @@ There are several options for the script:
   original board and create new packages for different colors. Format of
   dictionary entry is `"<ref>": "<library>:<module>"`  - e.g. `"PHOTO1":
   "Resistors:R_PHOTO_7mm"`.
+- `--no-drillholes` do not make the drill holes transparent.
 
 ## Writing Custom Styles
 

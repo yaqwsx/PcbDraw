@@ -199,7 +199,7 @@ def process_board_substrate_mask(container, name, source, colors):
                 item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff");
             mask.append(element)
 
-def get_board_substrate(board, colors):
+def get_board_substrate(board, colors, holes):
     """
     Plots all front layers from the board and arranges them in a visually appealing style.
     return SVG g element with the board substrate
@@ -237,6 +237,10 @@ def get_board_substrate(board, colors):
             if svg_file.endswith("-" + f + ".svg"):
                 process(container, f, os.path.join(tmp, svg_file), colors)
     shutil.rmtree(tmp)
+
+    if holes:
+        container.append(get_hole_mask(board))
+        container.attrib["mask"] = "url(#hole-mask)";
     return container
 
 def walk_components(board, export):
@@ -261,6 +265,50 @@ def walk_components(board, export):
         pos = (center.x, center.y, orient)
         export(lib, name, value, ref, pos)
         module = module.Next()
+
+def get_hole_mask(board):
+    defs = etree.Element("defs")
+    mask = etree.SubElement(defs, "mask", id="hole-mask")
+    container = etree.SubElement(mask, "g")
+
+    bb = board.ComputeBoundingBox();
+    bg = etree.SubElement(container, "rect", x="0", y="0", fill="white")
+    bg.attrib["x"] = str(ki2dmil(bb.GetX()))
+    bg.attrib["y"] = str(ki2dmil(bb.GetY()))
+    bg.attrib["width"] = str(ki2dmil(bb.GetWidth()))
+    bg.attrib["height"] = str(ki2dmil(bb.GetHeight()))
+
+    module = board.GetModules()
+    while module:
+        if module.GetPadCount() == 0:
+            module = module.Next()
+            continue
+        pad = module.Pads()
+        orient = module.GetOrientation()
+        while pad:
+            pos = pad.GetPosition()
+            pos.x = ki2dmil(pos.x)
+            pos.y = ki2dmil(pos.y)
+            size = map(ki2dmil, pad.GetDrillSize())
+            if size[0] > 0 and size[1] > 0:
+                if size[0] < size[1]:
+                    stroke = size[0]
+                    length = size[1] - size[0]
+                    points = "{} {} {} {}".format(0, -length / 2, 0, length / 2)
+                else:
+                    stroke = size[1]
+                    length = size[0] - size[1]
+                    points = "{} {} {} {}".format(-length / 2, 0, length / 2, 0)
+                el = etree.SubElement(container, "polyline")
+                el.attrib["stroke-linecap"] = "round"
+                el.attrib["stroke"] = "black"
+                el.attrib["stroke-width"] = str(stroke)
+                el.attrib["points"] = points
+                el.attrib["transform"] = "translate({} {}) rotate({})".format(
+                    pos.x, pos.y, -orient)
+            pad = pad.Next()
+        module = module.Next()
+    return defs
 
 def get_model_file(paths, lib, name, ref, remapping):
     """ Find model file in library considering component remapping """
@@ -343,6 +391,7 @@ if __name__ == "__main__":
                         help="JSON file with map part reference to <lib>:<model> to remap packages")
     parser.add_argument("-l", "--list-components", action="store_true",
                         help="Dry run, just list the components")
+    parser.add_argument("--no-drillholes", action="store_true", help="Do not make holes transparent")
 
     args = parser.parse_args()
     args.libraries = args.libraries.split(',')
@@ -379,7 +428,7 @@ if __name__ == "__main__":
     wrapper = etree.SubElement(document.getroot(), "g",
         transform="translate({}, {})".format(ki2dmil(-bb.GetX()), ki2dmil(-bb.GetY())))
 
-    wrapper.append(get_board_substrate(board, style))
+    wrapper.append(get_board_substrate(board, style, not args.no_drillholes))
     walk_components(board, lambda lib, name, val, ref, pos:
         component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
                                placeholder=args.placeholder, remapping=remapping))
