@@ -12,6 +12,13 @@ import tempfile
 import pcbnew
 from lxml import etree
 
+default_style = {
+    "copper": "#417e5a",
+    "board": "#4ca06c",
+    "silk": "#f0f0f0",
+    "pads": "#b5ae30",
+    "outline": "#000000"
+}
 
 class SvgPathItem:
     def __init__(self, path):
@@ -326,7 +333,7 @@ def load_remapping(remap_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("style", help="JSON file with board style")
+    parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("libraries", help="directories containing SVG footprints")
     parser.add_argument("output", help="destination for final SVG")
     parser.add_argument("board", help=".kicad_pcb file to draw")
@@ -342,7 +349,10 @@ if __name__ == "__main__":
     print(args)
 
     try:
-        style = load_style(args.style)
+        if args.style:
+            style = load_style(args.style)
+        else:
+            style = default_style
         remapping = load_remapping(args.remap)
     except RuntimeError as e:
         print(e.message)

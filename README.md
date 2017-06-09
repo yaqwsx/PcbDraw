@@ -26,10 +26,8 @@ separate repository: [PcbDraw-Lib](https://github.com/yaqwsx/PcbDraw-Lib).
 Usage of PcbDraw is simple, just run:
 
 ```.{bash}
-./pcbdraw.py <style> <libraries> <output_file> <input_file>
+./pcbdraw.py <libraries> <output_file> <input_file>
 ```
-- `style` is a path to a JSON file containing board colours definition. Several
-  example styles are in the styles directory.
 - `libraries` is a comma separated list of paths to directories containing module libraries. Modules are
   component footprints in SVG format.
 - `output_file` is a path to an output SVG file
@@ -41,6 +39,8 @@ the libraries, the script will output warning.
 
 There are several options for the script:
 
+- `--style=<JSON_file>` specifies color theme for the board. Default is a green
+  board, other styles can be found in the `styles` directories.
 - `--list-components` prints a list of all components from the front side of PCB.
   Doesn't produce drawing.
 - `--placeholder` shows a red square in the drawing for missing modules.
