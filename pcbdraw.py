@@ -284,6 +284,11 @@ def get_hole_mask(board):
             module = module.Next()
             continue
         pad = module.Pads()
+        try:
+            pad.GetPosition()
+        except:
+            # Newest nightly renames Pads to PadList
+            pad = module.PadsList()
         orient = module.GetOrientation()
         while pad:
             pos = pad.GetPosition()
