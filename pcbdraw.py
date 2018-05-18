@@ -338,7 +338,7 @@ def component_from_library(parent, paths, lib, name, value, ref, pos, placeholde
     if not f:
         print("Warning: component '{}' from library '{}' was not found".format(name, lib))
         if placeholder:
-            etree.SubElement(parent, "rect", x=str(ki2dmil(pos[0])), y=str(ki2dmil(pos[1])),
+            etree.SubElement(parent, "rect", x=str(ki2dmil(pos[0]) - 150), y=str(ki2dmil(pos[1]) - 150),
                              width="300", height="300", style="fill:red;")
         return
     parent.append(etree.Comment("{}:{}".format(lib, name)))
