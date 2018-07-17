@@ -199,18 +199,35 @@ def process_board_substrate_mask(container, name, source, colors):
                 item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff");
             mask.append(element)
 
-def get_board_substrate(board, colors, holes):
+def get_board_substrate(board, colors, holes, back = False):
     """
     Plots all front layers from the board and arranges them in a visually appealing style.
     return SVG g element with the board substrate
     """
-    toPlot = [
-        ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
-        ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
-        ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
-        ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
-        ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
-        ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
+    # toPlot = [
+    #     ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+    #     ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
+    #     ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
+    #     ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
+    #     ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
+    #     ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
+    toPlot = []
+    if(back):
+        toPlot = [
+            ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+            ("copper", [pcbnew.B_Cu], process_board_substrate_layer),
+            ("pads", [pcbnew.B_Cu], process_board_substrate_layer),
+            ("pads-mask", [pcbnew.B_Mask], process_board_substrate_mask),
+            ("silk", [pcbnew.B_SilkS], process_board_substrate_layer),
+            ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
+    else:
+        toPlot = [
+            ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+            ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
+            ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
+            ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
+            ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
+            ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
     container = etree.Element('g')
     container.attrib["clip-path"] = "url(#cut-off)";
     tmp = tempfile.mkdtemp()
@@ -397,6 +414,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--list-components", action="store_true",
                         help="Dry run, just list the components")
     parser.add_argument("--no-drillholes", action="store_true", help="Do not make holes transparent")
+    parser.add_argument("-b","--back", action="store_true", help="render the backside of the board")
 
     args = parser.parse_args()
     args.libraries = args.libraries.split(',')
@@ -433,7 +451,7 @@ if __name__ == "__main__":
     wrapper = etree.SubElement(document.getroot(), "g",
         transform="translate({}, {})".format(ki2dmil(-bb.GetX()), ki2dmil(-bb.GetY())))
 
-    wrapper.append(get_board_substrate(board, style, not args.no_drillholes))
+    wrapper.append(get_board_substrate(board, style, not args.no_drillholes, args.back))
     walk_components(board, lambda lib, name, val, ref, pos:
         component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
                                placeholder=args.placeholder, remapping=remapping))
