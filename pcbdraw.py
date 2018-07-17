@@ -199,7 +199,7 @@ def process_board_substrate_mask(container, name, source, colors):
                 item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff");
             mask.append(element)
 
-def get_board_substrate(board, colors, holes, back = False):
+def get_board_substrate(board, colors, holes, back):
     """
     Plots all front layers from the board and arranges them in a visually appealing style.
     return SVG g element with the board substrate
@@ -260,7 +260,7 @@ def get_board_substrate(board, colors, holes, back = False):
         container.attrib["mask"] = "url(#hole-mask)";
     return container
 
-def walk_components(board, back,export):
+def walk_components(board, back, export):
     module = board.GetModules()
     while True:
         if not module:
