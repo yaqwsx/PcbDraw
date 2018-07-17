@@ -260,13 +260,14 @@ def get_board_substrate(board, colors, holes, back = False):
         container.attrib["mask"] = "url(#hole-mask)";
     return container
 
-def walk_components(board, export):
+def walk_components(board, back,export):
     module = board.GetModules()
     while True:
         if not module:
             return
         # Top is for Eagle boards imported to KiCAD
-        if str(module.GetLayerName()) not in ["Top", "F.Cu"]:
+        if (str(module.GetLayerName()) in ["Back", "B.Cu"] and not  back) or \
+           (str(module.GetLayerName()) in ["Top", "F.Cu"]  and      back):
             module = module.Next()
             continue
         lib = str(module.GetFPID().GetLibNickname()).strip()
@@ -415,6 +416,7 @@ if __name__ == "__main__":
                         help="Dry run, just list the components")
     parser.add_argument("--no-drillholes", action="store_true", help="Do not make holes transparent")
     parser.add_argument("-b","--back", action="store_true", help="render the backside of the board")
+    parser.add_argument("--mirror", action="store_true", help="mirror the board")
 
     args = parser.parse_args()
     args.libraries = args.libraries.split(',')
@@ -438,21 +440,25 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args.list_components:
-        walk_components(board, lambda lib, name, val, ref, pos:
+        walk_components(board, args.back,lambda lib, name, val, ref, pos:
                         print_component(args.libraries, lib, name, val, ref, pos,
                                         remapping=remapping))
         sys.exit(0)
 
     bb = board.ComputeBoundingBox()
+    transform_string = ""
+    if(args.back ^ args.mirror):
+        transform_string = "translate({}, {}) scale(-1,1)".format(ki2dmil(bb.GetX()+bb.GetWidth()), ki2dmil(-bb.GetY()))
+    else:
+        transform_string = "translate({}, {})".format(ki2dmil(-bb.GetX()), ki2dmil(-bb.GetY()))
     document = empty_svg(
         width="{}cm".format(bb.GetWidth()/10000000.0),
         height="{}cm".format(bb.GetHeight()/10000000.0),
         viewBox="0 0 {} {}".format(ki2dmil(bb.GetWidth()), ki2dmil(bb.GetHeight())))
-    wrapper = etree.SubElement(document.getroot(), "g",
-        transform="translate({}, {})".format(ki2dmil(-bb.GetX()), ki2dmil(-bb.GetY())))
+    wrapper = etree.SubElement(document.getroot(), "g", transform= transform_string)
 
     wrapper.append(get_board_substrate(board, style, not args.no_drillholes, args.back))
-    walk_components(board, lambda lib, name, val, ref, pos:
+    walk_components(board, args.back, lambda lib, name, val, ref, pos:
         component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
                                placeholder=args.placeholder, remapping=remapping))
     document.write(args.output)
