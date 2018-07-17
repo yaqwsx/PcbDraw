@@ -204,13 +204,6 @@ def get_board_substrate(board, colors, holes, back):
     Plots all front layers from the board and arranges them in a visually appealing style.
     return SVG g element with the board substrate
     """
-    # toPlot = [
-    #     ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
-    #     ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
-    #     ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
-    #     ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
-    #     ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
-    #     ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
     toPlot = []
     if(back):
         toPlot = [
