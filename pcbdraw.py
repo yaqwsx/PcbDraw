@@ -454,4 +454,10 @@ if __name__ == "__main__":
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
         component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
                                placeholder=args.placeholder, remapping=remapping))
+
+    #make another pass for search, and if found, render the back side of the component
+    #the function will search for file with extension ".back.svg"
+    walk_components(board, not args.back, lambda lib, name, val, ref, pos:
+        component_from_library(wrapper, args.libraries, lib, name+".back", val, ref, pos,
+                               placeholder=args.placeholder, remapping=remapping))
     document.write(args.output)
