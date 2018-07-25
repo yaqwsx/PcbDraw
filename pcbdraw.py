@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 import tempfile
+import numpy as np
 
 import pcbnew
 from lxml import etree
@@ -68,6 +69,108 @@ def unique_prefix():
     unique_prefix.counter += 1
     return "pref_" + str(unique_prefix.counter)
 unique_prefix.counter = 0
+
+def matrix(data):
+    return np.array(data, dtype=np.float32)
+
+def extract_arg(args, index, default=None):
+    """
+    Return n-th element of array or default if out of range
+    """
+    if index >= len(args):
+        return default
+    return args[index]
+
+def to_trans_matrix(transform):
+    """
+    Given SVG transformation string returns corresponding matrix
+    """
+    m = matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    if transform is None:
+        return m
+    trans = re.findall(r'[a-z]+?\(.*?\)', transform)
+    for t in trans:
+        op, args = t.split('(')
+        args = [float(x) for x in re.findall(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?', args)]
+        if op == 'matrix':
+            m = np.matmul(m, matrix([
+                [args[0], args[2], args[4]],
+                [args[1], args[3], args[5]],
+                [0, 0, 1]]))
+        if op == 'translate':
+            x = args[0]
+            y = extract_arg(args, 1, 0)
+            m = np.matmul(m, matrix([
+                [1, 0, x],
+                [0, 1, y],
+                [0, 0, 1]]))
+        if op == 'scale':
+            x = args[0]
+            y = extract_arg(args, 1, 1)
+            m = np.matmul(m, matrix([
+                [x, 0, 0],
+                [0, y, 0],
+                [0, 0, 1]]))
+        if op == 'rotate':
+            cosa = np.cos(np.radians(args[0]))
+            sina = np.sin(np.radians(args[0]))
+            if len(args) != 1:
+                x, y = args[1:3]
+                m = np.matmul(m, matrix([
+                    [1, 0, x],
+                    [0, 1, y],
+                    [0, 0, 1]]))
+            m = np.matmul(m, matrix([
+                [cosa, -sina, 0],
+                [sina, cosa, 0],
+                [0, 0, 1]]))
+            if len(args) != 1:
+                m = np.matmul(m, matrix([
+                    [1, 0, -x],
+                    [0, 1, -y],
+                    [0, 0, 1]]))
+        if op == 'skewX':
+            tana = np.tan(np.radians(args[0]))
+            m = np.matmul(m, matrix([
+                [1, tana, 0],
+                [0, 1, 0],
+                [0, 0, 1]]))
+        if op == 'skewY':
+            tana = np.tan(np.radians(args[0]))
+            m = np.matmul(m, matrix([
+                [1, 0, 0],
+                [tana, 1, 0],
+                [0, 0, 1]]))
+    return m
+
+def collect_transformation(element, root=None):
+    """
+    Collect all the transformation applied to an element and return it as matrix
+    """
+    if root is None:
+        if element.getparent() is not None:
+            m = collect_transformation(element.getparent(), root)
+        else:
+            m = matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    else:
+        if element.getparent() != root:
+            m = collect_transformation(element.getparent(), root)
+        else:
+            m = matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    if "transform" not in element.attrib:
+        return m
+    trans = element.attrib["transform"]
+    return np.matmul(m, to_trans_matrix(trans))
+
+def element_position(element, root=None):
+    position = matrix([
+        [element.attrib["x"]],
+        [element.attrib["y"]],
+        [1]])
+    r = root
+    trans = collect_transformation(element, root=r)
+    position = np.matmul(trans, position)
+    return position[0][0] / position[2][0], position[1][0] / position[2][0]
 
 def ki2dmil(val):
     return val / 2540
@@ -360,8 +463,7 @@ def component_from_library(parent, paths, lib, name, value, ref, pos, placeholde
     origin_y = 0
     origin = r.find(".//*[@id='origin']")
     if origin is not None:
-        origin_x = float(origin.attrib["x"])
-        origin_y = float(origin.attrib["y"])
+        origin_x, origin_y = element_position(origin, root=r)
         origin.getparent().remove(origin)
     else:
         print("Warning: component '{}' from library '{}' has no ORIGIN".format(name, lib))
