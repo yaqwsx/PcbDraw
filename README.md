@@ -108,8 +108,6 @@ Feel free to submit issues and pull requests!
 - make reasonably complete module library
 - produce nicer SVG file structures (make SVG smaller by including each module
   exactly once, treat ids correctly,...)
-- show through-hole pads in copper
 - support value labels on modules
-- maybe supported Eagle boards directly (now you can import them into KiCAD and
+- maybe support Eagle boards directly (now you can import them into KiCAD and
   export as kicad_pcb)
-- make module origin more flexible
