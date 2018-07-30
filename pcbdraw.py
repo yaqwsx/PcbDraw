@@ -474,6 +474,8 @@ def print_component(paths, lib, name, value, ref, pos, remapping={}):
 def component_from_library(lib, name, value, ref, pos, comp, highlight):
     if not name:
         return
+    if comp["filter"] is not None and ref not in comp["filter"]:
+        return
     f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
     if not f:
         print("Warning: component '{}' from library '{}' was not found".format(name, lib))
@@ -565,11 +567,13 @@ if __name__ == "__main__":
     parser.add_argument("--no-drillholes", action="store_true", help="Do not make holes transparent")
     parser.add_argument("-b","--back", action="store_true", help="render the backside of the board")
     parser.add_argument("--mirror", action="store_true", help="mirror the board")
-    parser.add_argument("-a", "--highlight", help="comma separated list of parts to highlight")
+    parser.add_argument("-a", "--highlight", help="comma separated list of components to highlight")
+    parser.add_argument("-f", "--filter", help="comma separated list of components to show")
 
     args = parser.parse_args()
     args.libraries = args.libraries.split(',')
     args.highlight = args.highlight.split(',') if args.highlight is not None else []
+    args.filter = args.filter.split(',') if args.filter is not None else None
 
     try:
         if args.style:
@@ -617,7 +621,8 @@ if __name__ == "__main__":
         "container": comp_cont,
         "placeholder": args.placeholder,
         "remapping": remapping,
-        "libraries": args.libraries
+        "libraries": args.libraries,
+        "filter": args.filter
     }
 
     highlight = {
