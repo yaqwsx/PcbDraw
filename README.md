@@ -52,8 +52,9 @@ There are several options for the script:
   "Resistors:R_PHOTO_7mm"`.
 - `--no-drillholes` do not make the drill holes transparent.
 - `--back` render the backward of the board, it will mirror the board automatically
-
 - `--mirror` render the board mirrored on the x axis
+- `--highlight` take a comma separated list of components and highlight them
+- `--filter` take a comma separated list of components and show only them
 
 ## Writing Custom Styles
 
@@ -66,7 +67,10 @@ don't have any effect on modules):
     "board": "#4ca06c",
     "silk": "#f0f0f0",
     "pads": "#b5ae30",
-    "outline": "#000000"
+    "outline": "#000000",
+      "highlight-on-top": false,
+    "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
+    "highlight-padding": 1.5
 }
 ```
 
