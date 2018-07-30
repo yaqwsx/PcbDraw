@@ -617,6 +617,10 @@ if __name__ == "__main__":
         high_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
         comp_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
 
+    board_cont.attrib["id"] = "boardContainer"
+    comp_cont.attrib["id"] = "componentContainer"
+    high_cont.attrib["id"] = "highlightContainer"
+
     components = {
         "container": comp_cont,
         "placeholder": args.placeholder,
