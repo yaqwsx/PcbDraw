@@ -18,8 +18,13 @@ default_style = {
     "board": "#4ca06c",
     "silk": "#f0f0f0",
     "pads": "#b5ae30",
-    "outline": "#000000"
+    "outline": "#000000",
+    "highlight-on-top": False,
+    "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
+    "highlight-padding": 1.5
 }
+
+float_re = r'([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)'
 
 class SvgPathItem:
     def __init__(self, path):
@@ -91,7 +96,7 @@ def to_trans_matrix(transform):
     trans = re.findall(r'[a-z]+?\(.*?\)', transform)
     for t in trans:
         op, args = t.split('(')
-        args = [float(x) for x in re.findall(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?', args)]
+        args = [float(x) for x in re.findall(float_re, args)]
         if op == 'matrix':
             m = np.matmul(m, matrix([
                 [args[0], args[2], args[4]],
@@ -175,7 +180,24 @@ def element_position(element, root=None):
 def ki2dmil(val):
     return val / 2540
 
-def extract_svg_content(filename):
+def to_user_units(val):
+    x = float_re + r'\s*(pt|pc|mm|cm|in)?'
+    value, unit = re.findall(x, val)[0]
+    value = float(value)
+    if unit == "" or unit == "px":
+        return value
+    if unit == "pt":
+        return 1.25 * value
+    if unit == "pc":
+        return 15 * value
+    if unit == "mm":
+        return 3.543307 * value
+    if unit == "cm":
+        return 35.43307 * value
+    if unit == "in":
+        return 90
+
+def read_svg_unique(filename):
     prefix = unique_prefix() + "_"
     root = etree.parse(filename).getroot()
     # We have to ensure all Ids in SVG are unique. Let's make it nasty by
@@ -190,10 +212,14 @@ def extract_svg_content(filename):
     for i in ids:
         content = content.replace("#"+i, "#" + prefix + i)
     root = etree.fromstring(content)
-    # Remove SVG namespace to ease our lifes and change ids
     for el in root.getiterator():
         if "id" in el.attrib and el.attrib["id"] != "origin":
             el.attrib["id"] = prefix + el.attrib["id"]
+    return root
+
+def extract_svg_content(root):
+    # Remove SVG namespace to ease our lifes and change ids
+    for el in root.getiterator():
         if '}' in str(el.tag):
             el.tag = el.tag.split('}', 1)[1]
     return [ x for x in root if x.tag and x.tag not in ["title", "desc"]]
@@ -273,29 +299,29 @@ def process_board_substrate_layer(container, name, source, colors):
     layer = etree.SubElement(container, "g", id="substrate-"+name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
     if name == "pads":
-        layer.attrib["mask"] = "url(#pads-mask)";
-    for element in extract_svg_content(source):
+        layer.attrib["mask"] = "url(#pads-mask)"
+    for element in extract_svg_content(read_svg_unique(source)):
         strip_fill_svg(element)
         layer.append(element)
 
 def process_board_substrate_base(container, name, source, colors):
     clipPath = etree.SubElement(etree.SubElement(container, "defs"), "clipPath")
     clipPath.attrib["id"] = "cut-off"
-    clipPath.append(get_board_polygon(extract_svg_content(source)))
+    clipPath.append(get_board_polygon(extract_svg_content(read_svg_unique(source))))
 
     layer = etree.SubElement(container, "g", id="substrate-"+name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
-    layer.append(get_board_polygon(extract_svg_content(source)))
+    layer.append(get_board_polygon(extract_svg_content(read_svg_unique(source))))
     outline = etree.SubElement(layer, "g",
         style="fill:{0}; stroke: {0};".format(colors["outline"]))
-    for element in extract_svg_content(source):
+    for element in extract_svg_content(read_svg_unique(source)):
         strip_fill_svg(element)
         outline.append(element)
 
 def process_board_substrate_mask(container, name, source, colors):
     mask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
     mask.attrib["id"] = name
-    for element in extract_svg_content(source):
+    for element in extract_svg_content(read_svg_unique(source)):
         for item in element.getiterator():
             if "style" in item.attrib:
                 # KiCAD plots in black, for mask we need white
@@ -445,19 +471,20 @@ def print_component(paths, lib, name, value, ref, pos, remapping={}):
         ref, lib, name, pos[0], pos[1], math.degrees(pos[2]), f if f else "Not found")
     print(msg)
 
-def component_from_library(parent, paths, lib, name, value, ref, pos, placeholder=True, remapping={}):
+def component_from_library(lib, name, value, ref, pos, comp, highlight):
     if not name:
         return
-    f = get_model_file(paths, lib, name, ref, remapping)
+    f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
     if not f:
         print("Warning: component '{}' from library '{}' was not found".format(name, lib))
-        if placeholder:
-            etree.SubElement(parent, "rect", x=str(ki2dmil(pos[0]) - 150), y=str(ki2dmil(pos[1]) - 150),
+        if comp["placeholder"]:
+            etree.SubElement(comp["container"], "rect", x=str(ki2dmil(pos[0]) - 150), y=str(ki2dmil(pos[1]) - 150),
                              width="300", height="300", style="fill:red;")
         return
-    parent.append(etree.Comment("{}:{}".format(lib, name)))
-    r = etree.SubElement(parent, "g")
-    for x in extract_svg_content(f):
+    comp["container"].append(etree.Comment("{}:{}".format(lib, name)))
+    r = etree.SubElement(comp["container"], "g")
+    svg_tree = read_svg_unique(f)
+    for x in extract_svg_content(svg_tree):
         r.append(x)
     origin_x = 0
     origin_y = 0
@@ -470,6 +497,31 @@ def component_from_library(parent, paths, lib, name, value, ref, pos, placeholde
     r.attrib["transform"] = "translate({} {}) scale(393.700787402) rotate({}) translate({}, {})".format(
             ki2dmil(pos[0]), ki2dmil(pos[1]),
             -math.degrees(pos[2]), -origin_x, -origin_y)
+    if ref in highlight["items"]:
+        if "width" in svg_tree.attrib and "height" in svg_tree.attrib:
+            w = to_user_units(svg_tree.attrib["width"])
+            h = to_user_units(svg_tree.attrib["height"])
+            build_highlight(highlight, w, h, pos, (origin_x, origin_y), ref)
+        elif "viewBox" in svg_tree.attrib:
+            viewbox = re.split(" |,", svg_tree.attrib["viewBox"])
+            w = to_user_units(viewbox[2])
+            h = to_user_units(viewbox[3])
+            build_highlight(highlight, w, h, pos, (origin_x, origin_y), ref)
+        else:
+            print("Warning: component '{}' from library '{}' has no viewBox. Cannot highlight".format(name, lib))
+
+def build_highlight(preset, width, height, pos, origin, ref):
+    h = etree.SubElement(preset["container"], "rect")
+    scale = 393.700787402
+    h.attrib["style"] = preset["style"]
+    h.attrib["x"] = str(-preset["padding"])
+    h.attrib["y"] = str(-preset["padding"])
+    h.attrib["width"] = str(width + 2 * preset["padding"])
+    h.attrib["height"] = str(height + 2 * preset["padding"])
+    h.attrib["transform"] = "translate({} {}) scale(393.700787402) rotate({}) translate({}, {})".format(
+        ki2dmil(pos[0]), ki2dmil(pos[1]),
+        -math.degrees(pos[2]), -origin[0], -origin[1])
+    h.attrib["id"] = "h_" + ref
 
 def load_style(style_file):
     try:
@@ -477,7 +529,8 @@ def load_style(style_file):
             style = json.load(f)
     except IOError:
         raise RuntimeError("Cannot open style " + style_file)
-    required = set(["copper", "board", "silk", "pads", "outline"])
+    required = set(["copper", "board", "silk", "pads", "outline",
+        "highlight-style", "highlight-offset", "highlight-on-top"])
     missing = required - set(style.keys())
     if missing:
         raise RuntimeError("Missing following keys in style {}: {}"
@@ -512,9 +565,11 @@ if __name__ == "__main__":
     parser.add_argument("--no-drillholes", action="store_true", help="Do not make holes transparent")
     parser.add_argument("-b","--back", action="store_true", help="render the backside of the board")
     parser.add_argument("--mirror", action="store_true", help="mirror the board")
+    parser.add_argument("-a", "--highlight", help="comma separated list of parts to highlight")
 
     args = parser.parse_args()
     args.libraries = args.libraries.split(',')
+    args.highlight = args.highlight.split(',') if args.highlight is not None else []
 
     try:
         if args.style:
@@ -549,16 +604,37 @@ if __name__ == "__main__":
         width="{}cm".format(bb.GetWidth()/10000000.0),
         height="{}cm".format(bb.GetHeight()/10000000.0),
         viewBox="0 0 {} {}".format(ki2dmil(bb.GetWidth()), ki2dmil(bb.GetHeight())))
-    wrapper = etree.SubElement(document.getroot(), "g", transform= transform_string)
 
-    wrapper.append(get_board_substrate(board, style, not args.no_drillholes, args.back))
+    board_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
+    if style["highlight-on-top"]:
+        comp_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
+        high_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
+    else:
+        high_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
+        comp_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
+
+    components = {
+        "container": comp_cont,
+        "placeholder": args.placeholder,
+        "remapping": remapping,
+        "libraries": args.libraries
+    }
+
+    highlight = {
+        "container": high_cont,
+        "items": args.highlight,
+        "style": style["highlight-style"],
+        "padding": style["highlight-padding"]
+    }
+
+    board_cont.append(get_board_substrate(board, style, not args.no_drillholes, args.back))
+
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
-        component_from_library(wrapper, args.libraries, lib, name, val, ref, pos,
-                               placeholder=args.placeholder, remapping=remapping))
+        component_from_library(lib, name, val, ref, pos, components, highlight))
 
     #make another pass for search, and if found, render the back side of the component
     #the function will search for file with extension ".back.svg"
     walk_components(board, not args.back, lambda lib, name, val, ref, pos:
-        component_from_library(wrapper, args.libraries, lib, name+".back", val, ref, pos,
-                               placeholder=args.placeholder, remapping=remapping))
+        component_from_library(lib, name+".back", val, ref, pos, components, highlight))
+
     document.write(args.output)
