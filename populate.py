@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
 import mistune
+import lib.mdrenderer
 import re
 import codecs
 import pybars
@@ -9,6 +10,7 @@ import argparse
 import sys
 import os
 import subprocess
+
 
 class PcbDrawInlineLexer(mistune.InlineLexer):
     def __init__(self, renderer, rules=None, **kwargs):
@@ -29,95 +31,97 @@ class PcbDrawInlineLexer(mistune.InlineLexer):
         components = map(lambda x: x.strip(), components.split(","))
         return self.renderer.pcbdraw(side, components)
 
-class Renderer(mistune.Renderer):
-    def __init__(self):
-        super(Renderer, self).__init__(escape=False)
-        self.items = []
-        self.current_item = None
-        self.active_side = "front"
-        self.visited_components = []
-        self.active_components = []
+def Renderer(BaseRenderer):
+    class Tmp(BaseRenderer):
+        def __init__(self):
+            super(Tmp, self).__init__(escape=False)
+            self.items = []
+            self.current_item = None
+            self.active_side = "front"
+            self.visited_components = []
+            self.active_components = []
 
-    def append_comment(self, html):
-        if self.current_item is not None and self.current_item["type"] == "steps":
-            self.items.append(self.current_item)
-        if self.current_item is None or self.current_item["type"] == "steps":
-            self.current_item = {
-                "is_comment": True,
-                "type": "comment",
-                "content": ""
+        def append_comment(self, html):
+            if self.current_item is not None and self.current_item["type"] == "steps":
+                self.items.append(self.current_item)
+            if self.current_item is None or self.current_item["type"] == "steps":
+                self.current_item = {
+                    "is_comment": True,
+                    "type": "comment",
+                    "content": ""
+                }
+            self.current_item["content"] += html
+
+        def append_step(self, step):
+            if self.current_item is not None and self.current_item["type"] == "comment":
+                self.items.append(self.current_item)
+            if self.current_item is None or self.current_item["type"] == "comment":
+                self.current_item = {
+                    "is_step": True,
+                    "type": "steps",
+                    "steps": []
+                }
+            self.current_item["steps"].append(step)
+
+        def output(self):
+            items = self.items
+            items.append(self.current_item)
+            return items
+
+        def pcbdraw(self, side, components):
+            self.active_side = side
+            self.visited_components += components
+            self.active_components = components
+            return ""
+
+        def block_code(self, code, lang):
+            retval = super(Tmp, self).block_code(code, lang)
+            self.append_comment(retval)
+            return retval
+
+        def block_quote(self, text):
+            retval = super(Tmp, self).block_quote(text)
+            self.append_comment(retval)
+            return retval
+
+        def block_html(self, html):
+            retval = super(Tmp, self).block_html(html)
+            self.append_comment(retval)
+            return retval
+
+        def header(self, text, level, raw=None):
+            retval = super(Tmp, self).header(text, level, raw)
+            self.append_comment(retval)
+            return retval
+
+        def hrule(self):
+            retval = super(Tmp, self).hrule()
+            self.append_comment(retval)
+            return retval
+
+        def list(self, body, ordered=True):
+            return ""
+
+        def list_item(self, text):
+            step = {
+                "side": self.active_side,
+                "components": self.visited_components,
+                "active_components": self.active_components,
+                "comment": text
             }
-        self.current_item["content"] += html
+            self.append_step(step)
+            return ""
 
-    def append_step(self, step):
-        if self.current_item is not None and self.current_item["type"] == "comment":
-            self.items.append(self.current_item)
-        if self.current_item is None or self.current_item["type"] == "comment":
-            self.current_item = {
-                "is_step": True,
-                "type": "steps",
-                "steps": []
-            }
-        self.current_item["steps"].append(step)
+        def paragraph(self, text):
+            retval = super(Tmp, self).paragraph(text)
+            self.append_comment(retval)
+            return retval
 
-    def output(self):
-        items = self.items
-        items.append(self.current_item)
-        return items
-
-    def pcbdraw(self, side, components):
-        self.active_side = side
-        self.visited_components += components
-        self.active_components = components
-        return ""
-
-    def block_code(self, code, lang):
-        retval = super(Renderer, self).block_code(code, lang)
-        self.append_comment(retval)
-        return retval
-
-    def block_quote(self, text):
-        retval = super(Renderer, self).block_quote(text)
-        self.append_comment(retval)
-        return retval
-
-    def block_html(self, html):
-        retval = super(Renderer, self).block_html(html)
-        self.append_comment(retval)
-        return retval
-
-    def header(self, text, level, raw=None):
-        retval = super(Renderer, self).header(text, level, raw)
-        self.append_comment(retval)
-        return retval
-
-    def hrule(self):
-        retval = super(Renderer, self).hrule()
-        self.append_comment(retval)
-        return retval
-
-    def list(self, body, ordered=True):
-        return ""
-
-    def list_item(self, text):
-        step = {
-            "side": self.active_side,
-            "components": self.visited_components,
-            "active_components": self.active_components,
-            "comment": text
-        }
-        self.append_step(step)
-        return ""
-
-    def paragraph(self, text):
-        retval = super(Renderer, self).paragraph(text)
-        self.append_comment(retval)
-        return retval
-
-    def table(self, header, body):
-        retval = super(Renderer, self).table(header, body)
-        self.append_comment(retval)
-        return retval
+        def table(self, header, body):
+            retval = super(Tmp, self).table(header, body)
+            self.append_comment(retval)
+            return retval
+    return Tmp()
 
 def load_content(filename):
     header = None
@@ -258,7 +262,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args["type"] == "html":
-        renderer = Renderer()
+        renderer = Renderer(mistune.Renderer)
         outputfile = "index.html"
         try:
             template = read_template(args["template"])
