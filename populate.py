@@ -149,10 +149,18 @@ def generate_html(template, input):
         "items": input
     }
     template = pybars.Compiler().compile(template)
-    return template(input).encode('utf-8')
+    return template(input).encode("utf-8")
 
 def generate_markdown(input):
-    pass
+    output = ""
+    for item in input:
+        if item["type"] == "comment":
+            output += item["content"] + "\n"
+        else:
+            for x in item["steps"]:
+                output += "##### " + x["comment"] + "\n\n"
+                output += "![step](" + x["img"] + ")\n\n"
+    return output.encode("utf-8")
 
 def flatten(l):
     return [item for sublist in l for item in sublist]
@@ -270,7 +278,7 @@ if __name__ == "__main__":
             print("Cannot open template file " + args["template"])
             sys.exit(1)
     else:
-        renderer = None # ToDo
+        renderer = Renderer(lib.mdrenderer.MdRenderer)
         outputfile = "index.md"
     content = parse_content(renderer, content)
     content = generate_images(content, args["board"], args["libs"],
