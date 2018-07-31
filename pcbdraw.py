@@ -556,8 +556,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("libraries", help="directories containing SVG footprints")
-    parser.add_argument("output", help="destination for final SVG")
     parser.add_argument("board", help=".kicad_pcb file to draw")
+    parser.add_argument("output", help="destination for final SVG")
     parser.add_argument("-p", "--placeholder", action="store_true",
                         help="show placeholder for missing components")
     parser.add_argument("-m", "--remap",
