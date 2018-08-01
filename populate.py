@@ -28,7 +28,7 @@ class PcbDrawInlineLexer(mistune.InlineLexer):
     def output_pcbdraw(self, m):
         text = m.group(1)
         side, components = text.split("|")
-        components = map(lambda x: x.strip(), components.split(","))
+        components = list(map(lambda x: x.strip(), components.split(",")))
         return self.renderer.pcbdraw(side, components)
 
 def Renderer(BaseRenderer):
@@ -181,35 +181,46 @@ def generate_images(content, boardfilename, libs, parameters, name, outdir):
             x["img"] = filename
     return content
 
+def svg_to_png(infile, outfile, dpi=300):
+    import cairo
+    import gi
+    gi.require_version('Rsvg', '2.0')
+    from gi.repository import Rsvg
+
+    handle = Rsvg.Handle()
+    svg = handle.new_from_file(infile)
+    svg.set_dpi(dpi)
+    dim = svg.get_dimensions()
+    w, h = dim.width, dim.height
+    img =  cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+    ctx = cairo.Context(img)
+    svg.render_cairo(ctx)
+    img.write_to_png(outfile)
+
 def generate_image(boardfilename, libs, side, components, active, parameters, outputfile):
+    svgfilename = os.path.splitext(outputfile)
+    svgfilename, ext = svgfilename[0] + ".svg", svgfilename[1]
+
     command = ["./pcbdraw.py", "-f", ",".join(components), "-a", ",".join(active)]
     if side == "back":
         command.append("-b")
     command += flatten(map(lambda x: x.split(" ", 1), parameters))
     command.append(libs)
     command.append(boardfilename)
-    command.append(outputfile)
+    command.append(svgfilename)
     try:
         output = subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         print("PcbDraw failed with code {} and output: ".format(e.returncode))
         print(e.output)
         sys.exit(1)
-
-header, content = load_content("example.md")
-
-
-# renderer = Renderer()
-# lexer = PcbDrawInlineLexer(renderer)
-# markdown = mistune.Markdown(renderer=renderer, inline=lexer)
-# markdown(content)
-# renderer.finalize()
-
-# with codecs.open("templates/simple.handlebars", encoding="utf-8") as f:
-#     template = pybars.Compiler().compile(f.read())
-#     print(template(renderer).encode('utf-8'))
-
-# print(header)
+    if ext != ".svg":
+        if ext == ".png":
+            svg_to_png(svgfilename, outputfile)
+            os.remove(svgfilename)
+        else:
+            print("Unsupported image type: {}".format(ext))
+            sys.exit(1)
 
 def merge_args(args, header):
     for key in filter(lambda x: not x.startswith("_"), dir(args)):
@@ -288,5 +299,5 @@ if __name__ == "__main__":
     else:
         output = generate_markdown(content)
 
-    with open(os.path.join(args["output"], outputfile), "w") as f:
+    with open(os.path.join(args["output"], outputfile), "wb") as f:
         f.write(output)
