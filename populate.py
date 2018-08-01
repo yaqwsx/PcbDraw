@@ -10,6 +10,7 @@ import argparse
 import sys
 import os
 import subprocess
+from copy import deepcopy
 
 
 class PcbDrawInlineLexer(mistune.InlineLexer):
@@ -109,7 +110,7 @@ def Renderer(BaseRenderer):
                 "active_components": self.active_components,
                 "comment": text
             }
-            self.append_step(step)
+            self.append_step(deepcopy(step))
             return ""
 
         def paragraph(self, text):
@@ -202,7 +203,7 @@ def generate_image(boardfilename, libs, side, components, active, parameters, ou
     svgfilename, ext = svgfilename[0] + ".svg", svgfilename[1]
 
     command = ["./pcbdraw.py", "-f", ",".join(components), "-a", ",".join(active)]
-    if side == "back":
+    if side.startswith("back"):
         command.append("-b")
     command += flatten(map(lambda x: x.split(" ", 1), parameters))
     command.append(libs)
