@@ -158,7 +158,7 @@ def generate_markdown(input):
             output += item["content"] + "\n"
         else:
             for x in item["steps"]:
-                output += "##### " + x["comment"] + "\n\n"
+                output += "#### " + x["comment"] + "\n\n"
                 output += "![step](" + x["img"] + ")\n\n"
     return output.encode("utf-8")
 
@@ -222,6 +222,16 @@ def generate_image(boardfilename, libs, side, components, active, parameters, ou
             print("Unsupported image type: {}".format(ext))
             sys.exit(1)
 
+def relativize_header_paths(header, to):
+    for key in ["template", "board", "libs"]:
+        if key not in header:
+            continue
+        if os.path.isabs(header[key]):
+            continue
+        x = os.path.join(to, header[key])
+        header[key] = os.path.normpath(x)
+    return header
+
 def merge_args(args, header):
     for key in filter(lambda x: not x.startswith("_"), dir(args)):
         val = getattr(args, key)
@@ -272,6 +282,7 @@ if __name__ == "__main__":
     except IOError:
         print("Cannot open source file " + args.input)
         sys.exit(1)
+    header = relativize_header_paths(header, os.path.dirname(args.input))
     args = merge_args(args, header)
 
     try:
