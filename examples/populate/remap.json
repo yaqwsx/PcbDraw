@@ -1,5 +1,7 @@
 {
-    "L_G": "LEDs:LED-5MM_green",
-    "L_B": "LEDs:LED-5MM_blue",
-    "L_Y": "LEDs:LED-5MM_yellow"
+    "L_G1": "LEDs:LED-5MM_green",
+    "L_B1": "LEDs:LED-5MM_blue",
+    "L_Y1": "LEDs:LED-5MM_yellow",
+    "PHOTO1": "yaqwsx:R_PHOTO_7mm",
+    "J8": "yaqwsx:Pin_Header_Straight_1x02_circle"
 }
