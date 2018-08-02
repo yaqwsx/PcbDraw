@@ -478,7 +478,7 @@ def component_from_library(lib, name, value, ref, pos, comp, highlight):
         return
     f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
     if not f:
-        print("Warning: component '{}' from library '{}' was not found".format(name, lib))
+        print("Warning: component '{}' for footprint '{}' from library '{}' was not found".format(name, ref, lib))
         if comp["placeholder"]:
             etree.SubElement(comp["container"], "rect", x=str(ki2dmil(pos[0]) - 150), y=str(ki2dmil(pos[1]) - 150),
                              width="300", height="300", style="fill:red;")
