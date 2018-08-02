@@ -1,5 +1,6 @@
 ---
 params:
+    - --remap remap.json
 img_name: img/populating_{}.png
 template: ../../templates/simple.handlebars
 type: html

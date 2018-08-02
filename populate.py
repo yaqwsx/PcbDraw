@@ -223,6 +223,12 @@ def generate_image(boardfilename, libs, side, components, active, parameters, ou
             print("Unsupported image type: {}".format(ext))
             sys.exit(1)
 
+def find_command(list, command):
+    for x in list:
+        if x.startswith(command):
+            return x
+    return None
+
 def relativize_header_paths(header, to):
     for key in ["template", "board", "libs"]:
         if key not in header:
@@ -231,6 +237,20 @@ def relativize_header_paths(header, to):
             continue
         x = os.path.join(to, header[key])
         header[key] = os.path.normpath(x)
+    if "params" in header:
+        x = header["params"]
+        newlist = []
+        for key in ["--style", "--remap"]:
+            c = find_command(x, key)
+            if c is None:
+                continue
+            y = c.split(" ")
+            command, arg = y[0], y[1]
+            if os.path.isabs(arg):
+                continue
+            c = command + " " + os.path.normpath(os.path.join(to, arg))
+            newlist.append(c)
+        header["params"] = newlist
     return header
 
 def merge_args(args, header):
