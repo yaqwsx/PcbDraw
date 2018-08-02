@@ -7,11 +7,7 @@ with images suitable for GitHub wiki.
 It allows you to write text, incrementally add new components to the board and
 highlight newly added components.
 
-## DependenciesUsage of PcbDraw is simple, just run:
-
-```.{bash}
-./pcbdraw.py <libraries> <input_file> <output_file>
-```
+## Dependencies
 
 Populate requires PcbDraw and also modules `mistune` and `py3bar`. If you
 also want to use feature to convert images from vector to bitmap, you need Caira
