@@ -35,5 +35,3 @@ Feel free to submit issues and pull requests!
 - produce nicer SVG file structures (make SVG smaller by including each module
   exactly once, treat ids correctly,...)
 - support value labels on modules
-- maybe support Eagle boards directly (now you can import them into KiCAD and
-  export as kicad_pcb)

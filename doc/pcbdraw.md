@@ -87,8 +87,6 @@ wrote the `<libraries>` list.
 
 ## Eagle Boards
 
-Boards from Eagle CAD are not supported directly now. You can import an Eagle
-board into KiCAD and then feed it into PcbDraw. This works fine (PcbDraw can
-deal with different layer names, etc.), however there are minor flaws with the
-import and user labels and via stitching can disappear (which is usually fine
-for the purposes of drawing).
+Boards from Eagle CAD are not supported directly now (and probably never will).
+You can import an Eagle board into KiCAD and then feed it into PcbDraw. Since
+version 5 the import feature works great.
