@@ -3,7 +3,7 @@
 Convert your KiCAD boards into nice looking 2D drawings suitable for pinout
 diagrams. Never draw them manually again!
 
-![example](example.png)
+![example](promo_pcbdraw.png)
 
 This small Python script takes a KiCAD board (.kicad_pcb file) and produces a 2D
 nice looking drawing of the board as an SVG file. This allows you to quickly and
@@ -15,6 +15,8 @@ You and your users will love them!
 
 PcbDraw also comes with a small utility called Populate which allows you to
 easily specify & maintain nice looking HTML or Markdown population manuals.
+
+![example](promo_populate.jpg)
 
 ## Usage
 
