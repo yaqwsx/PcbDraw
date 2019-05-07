@@ -60,7 +60,8 @@ don't have any effect on modules):
     "outline": "#000000",
     "highlight-on-top": false,
     "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
-    "highlight-padding": 1.5
+    "highlight-padding": 1.5,
+    "highlight-offset": 0
 }
 ```
 
