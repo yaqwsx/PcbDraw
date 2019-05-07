@@ -21,7 +21,8 @@ default_style = {
     "outline": "#000000",
     "highlight-on-top": False,
     "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
-    "highlight-padding": 1.5
+    "highlight-padding": 1.5,
+    "highlight-offset": 0
 }
 
 float_re = r'([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)'
@@ -30,7 +31,7 @@ class SvgPathItem:
     def __init__(self, path):
         path = re.sub(r"([MLA])(\d+)", r"\1 \2", path)
         path = re.split("[, ]", path)
-        path = filter( lambda x: x, path)
+        path = list(filter(lambda x: x, path))
         if path[0] != "M":
             raise SyntaxError("Only paths with absolute position are supported")
         self.start = tuple(map(float, path[1:3]))
@@ -398,8 +399,14 @@ def walk_components(board, back, export):
         except AttributeError:
             # it seems we are working on Kicad >4.0.6, which has a changed method name
             name = str(module.GetFPID().GetLibItemName()).strip()
-        value = unicode(module.GetValue()).strip()
-        ref = unicode(module.GetReference()).strip()
+
+        if (sys.version_info > (3, 0)):
+            value = str(module.GetValue()).strip()
+            ref = str(module.GetReference()).strip()
+        else:
+            value = unicode(module.GetValue()).strip()
+            ref = unicode(module.GetReference()).strip()
+
         center = module.GetCenter()
         orient = math.radians(module.GetOrientation() / 10)
         pos = (center.x, center.y, orient)
