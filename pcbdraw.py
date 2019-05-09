@@ -212,7 +212,10 @@ def read_svg_unique(filename):
         content = f.read()
     for i in ids:
         content = content.replace("#"+i, "#" + prefix + i)
-    root = etree.fromstring(content)
+    if (sys.version_info > (3, 0)):
+        root = etree.fromstring(bytes(content, 'utf-8'))
+    else:
+        root = etree.fromstring(content_byte)
     for el in root.getiterator():
         if "id" in el.attrib and el.attrib["id"] != "origin":
             el.attrib["id"] = prefix + el.attrib["id"]
