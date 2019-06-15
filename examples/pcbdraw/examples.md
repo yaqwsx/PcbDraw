@@ -24,7 +24,7 @@ To render the back side:
 ./pcbdraw -b
     examples/PcbDraw-Lib/KiCAD-base
     examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
-    front.svg
+    back.svg
 ```
 
 To use different style:
