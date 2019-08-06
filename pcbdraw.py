@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import json
@@ -179,7 +179,7 @@ def element_position(element, root=None):
     return position[0][0] / position[2][0], position[1][0] / position[2][0]
 
 def ki2dmil(val):
-    return val / 2540
+    return val // 2540
 
 def to_user_units(val):
     x = float_re + r'\s*(pt|pc|mm|cm|in)?'
@@ -212,10 +212,7 @@ def read_svg_unique(filename):
         content = f.read()
     for i in ids:
         content = content.replace("#"+i, "#" + prefix + i)
-    if (sys.version_info > (3, 0)):
-        root = etree.fromstring(bytes(content, 'utf-8'))
-    else:
-        root = etree.fromstring(content_byte)
+    root = etree.fromstring(str.encode(content))
     for el in root.getiterator():
         if "id" in el.attrib and el.attrib["id"] != "origin":
             el.attrib["id"] = prefix + el.attrib["id"]
@@ -402,14 +399,8 @@ def walk_components(board, back, export):
         except AttributeError:
             # it seems we are working on Kicad >4.0.6, which has a changed method name
             name = str(module.GetFPID().GetLibItemName()).strip()
-
-        if (sys.version_info > (3, 0)):
-            value = str(module.GetValue()).strip()
-            ref = str(module.GetReference()).strip()
-        else:
-            value = unicode(module.GetValue()).strip()
-            ref = unicode(module.GetReference()).strip()
-
+        value = module.GetValue().strip()
+        ref = module.GetReference().strip()
         center = module.GetCenter()
         orient = math.radians(module.GetOrientation() / 10)
         pos = (center.x, center.y, orient)
@@ -444,7 +435,7 @@ def get_hole_mask(board):
             pos = pad.GetPosition()
             pos.x = ki2dmil(pos.x)
             pos.y = ki2dmil(pos.y)
-            size = map(ki2dmil, pad.GetDrillSize())
+            size = list(map(ki2dmil, pad.GetDrillSize()))
             if size[0] > 0 and size[1] > 0:
                 if size[0] < size[1]:
                     stroke = size[0]
