@@ -182,22 +182,6 @@ def generate_images(content, boardfilename, libs, parameters, name, outdir):
             x["img"] = filename
     return content
 
-def svg_to_png(infile, outfile, dpi=300):
-    import cairo
-    import gi
-    gi.require_version('Rsvg', '2.0')
-    from gi.repository import Rsvg
-
-    handle = Rsvg.Handle()
-    svg = handle.new_from_file(infile)
-    svg.set_dpi(dpi)
-    dim = svg.get_dimensions()
-    w, h = dim.width, dim.height
-    img =  cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
-    ctx = cairo.Context(img)
-    svg.render_cairo(ctx)
-    img.write_to_png(outfile)
-
 def generate_image(boardfilename, libs, side, components, active, parameters, outputfile):
     svgfilename = os.path.splitext(outputfile)
     svgfilename, ext = svgfilename[0] + ".svg", svgfilename[1]
@@ -215,13 +199,6 @@ def generate_image(boardfilename, libs, side, components, active, parameters, ou
         print("PcbDraw failed with code {} and output: ".format(e.returncode))
         print(e.output)
         sys.exit(1)
-    if ext != ".svg":
-        if ext == ".png":
-            svg_to_png(svgfilename, outputfile)
-            os.remove(svgfilename)
-        else:
-            print("Unsupported image type: {}".format(ext))
-            sys.exit(1)
 
 def find_command(list, command):
     for x in list:

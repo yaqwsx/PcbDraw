@@ -526,6 +526,22 @@ def build_highlight(preset, width, height, pos, origin, ref):
         -math.degrees(pos[2]), -origin[0], -origin[1])
     h.attrib["id"] = "h_" + ref
 
+def svg_to_png(infile, outfile, dpi=300):
+    import cairo
+    import gi
+    gi.require_version('Rsvg', '2.0')
+    from gi.repository import Rsvg
+
+    handle = Rsvg.Handle()
+    svg = handle.new_from_file(infile)
+    svg.set_dpi(dpi)
+    dim = svg.get_dimensions()
+    w, h = dim.width, dim.height
+    img =  cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+    ctx = cairo.Context(img)
+    svg.render_cairo(ctx)
+    img.write_to_png(outfile)
+
 def load_style(style_file):
     try:
         with open(style_file, "r") as f:
@@ -558,7 +574,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("libraries", help="directories containing SVG footprints")
     parser.add_argument("board", help=".kicad_pcb file to draw")
-    parser.add_argument("output", help="destination for final SVG")
+    parser.add_argument("output", help="destination for final SVG or PNG file")
     parser.add_argument("-p", "--placeholder", action="store_true",
                         help="show placeholder for missing components")
     parser.add_argument("-m", "--remap",
@@ -585,6 +601,11 @@ if __name__ == "__main__":
     except RuntimeError as e:
         print(e.message)
         sys.exit(1)
+
+    if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png"]:
+        print("Output can be either an SVG or PNG file")
+        sys.exit(1)
+
     try:
         print("Please ignore following debug output of KiCAD Python API")
         board = pcbnew.LoadBoard(args.board)
@@ -647,4 +668,10 @@ if __name__ == "__main__":
     walk_components(board, not args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name+".back", val, ref, pos, components, highlight))
 
-    document.write(args.output)
+    if args.output.endswith(".svg") or args.output.endswith(".SVG"):
+        document.write(args.output)
+    else:
+        with tempfile.NamedTemporaryFile() as tmp_f:
+            document.write(tmp_f)
+            tmp_f.flush()
+            svg_to_png(tmp_f.name, args.output)
