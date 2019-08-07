@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import mistune
-import lib.mdrenderer
+import pcbdraw.mdrenderer
 import re
 import codecs
 import pybars
@@ -262,7 +262,7 @@ def validate_args(args):
     if args["params"] is None:
         args["params"] = []
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="source file")
     parser.add_argument("output", help="output directory")
@@ -298,7 +298,7 @@ if __name__ == "__main__":
             print("Cannot open template file " + args["template"])
             sys.exit(1)
     else:
-        renderer = Renderer(lib.mdrenderer.MdRenderer)
+        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer)
         outputfile = "index.md"
     content = parse_content(renderer, content)
     content = generate_images(content, args["board"], args["libs"],
@@ -310,3 +310,6 @@ if __name__ == "__main__":
 
     with open(os.path.join(args["output"], outputfile), "wb") as f:
         f.write(output)
+
+if __name__ == '__main__':
+    main()

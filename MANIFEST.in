@@ -1,0 +1,3 @@
+recursive-include pcbdraw/footprints *.svg
+recursive-include pcbdraw/styles *.json
+recursive-include pcbdraw/templates *

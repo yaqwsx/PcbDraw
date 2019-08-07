@@ -1,0 +1,6 @@
+[submodule "pcbdraw/PcbDraw-Lib"]
+	path = pcbdraw/footprints
+	url = https://github.com/yaqwsx/PcbDraw-Lib.git
+[submodule "pcbdraw/footprints"]
+	path = pcbdraw/footprints
+	url = https://github.com/yaqwsx/PcbDraw-Lib.git

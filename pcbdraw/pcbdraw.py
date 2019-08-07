@@ -569,7 +569,8 @@ def load_remapping(remap_file):
     except IOError:
         raise RuntimeError("Cannot open remapping file " + remap_file)
 
-if __name__ == "__main__":
+def main():
+    print(__file__)
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("libraries", help="directories containing SVG footprints")
@@ -675,3 +676,6 @@ if __name__ == "__main__":
             document.write(tmp_f)
             tmp_f.flush()
             svg_to_png(tmp_f.name, args.output)
+
+if __name__ == '__main__':
+    main()
