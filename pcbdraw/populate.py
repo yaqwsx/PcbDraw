@@ -186,11 +186,12 @@ def generate_image(boardfilename, libs, side, components, active, parameters, ou
     svgfilename = os.path.splitext(outputfile)
     svgfilename, ext = svgfilename[0] + ".svg", svgfilename[1]
 
-    command = ["./pcbdraw.py", "-f", ",".join(components), "-a", ",".join(active)]
+    command = ["pcbdraw", "-f", ",".join(components), "-a", ",".join(active)]
     if side.startswith("back"):
         command.append("-b")
     command += flatten(map(lambda x: x.split(" ", 1), parameters))
-    command.append(libs)
+    if libs:
+        command.append("--libs=" + libs)
     command.append(boardfilename)
     command.append(svgfilename)
     try:
