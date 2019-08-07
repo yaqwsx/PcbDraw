@@ -43,7 +43,7 @@ class SvgPathItem:
             self.type = path[0]
             self.args = None
         elif path[0] == "A":
-            args = map(float, path[1:8])
+            args = list(map(float, path[1:8]))
             self.end = (args[5], args[6])
             self.args = args[0:5]
             self.type = path[0]
@@ -376,7 +376,8 @@ def get_board_substrate(board, colors, holes, back):
         for svg_file in os.listdir(tmp):
             if svg_file.endswith("-" + f + ".svg"):
                 process(container, f, os.path.join(tmp, svg_file), colors)
-    shutil.rmtree(tmp)
+    print(tmp)
+    # shutil.rmtree(tmp)
 
     if holes:
         container.append(get_hole_mask(board))
@@ -569,18 +570,25 @@ def load_remapping(remap_file):
     except IOError:
         raise RuntimeError("Cannot open remapping file " + remap_file)
 
+def adjust_lib_path(path):
+    base = os.path.dirname(__file__)
+    if path == "default" or path == "kicad-default":
+        return os.path.join(base, "footprints", "KiCAD-base")
+    if path == "eagle-default":
+        return os.path.join(base, "footprints", "Eagle-export")
+    return path
+
 def main():
-    print(__file__)
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--style", help="JSON file with board style")
-    parser.add_argument("libraries", help="directories containing SVG footprints")
     parser.add_argument("board", help=".kicad_pcb file to draw")
     parser.add_argument("output", help="destination for final SVG or PNG file")
+    parser.add_argument("-l", "--libs", help="coma separated list of libraries; use default, kicad-default or eagle-default for built-in libraries", default="default")
     parser.add_argument("-p", "--placeholder", action="store_true",
                         help="show placeholder for missing components")
     parser.add_argument("-m", "--remap",
                         help="JSON file with map part reference to <lib>:<model> to remap packages")
-    parser.add_argument("-l", "--list-components", action="store_true",
+    parser.add_argument("-c", "--list-components", action="store_true",
                         help="Dry run, just list the components")
     parser.add_argument("--no-drillholes", action="store_true", help="Do not make holes transparent")
     parser.add_argument("-b","--back", action="store_true", help="render the backside of the board")
@@ -589,7 +597,7 @@ def main():
     parser.add_argument("-f", "--filter", help="comma separated list of components to show")
 
     args = parser.parse_args()
-    args.libraries = args.libraries.split(',')
+    args.libs = [adjust_lib_path(path) for path in args.libs.split(',')]
     args.highlight = args.highlight.split(',') if args.highlight is not None else []
     args.filter = args.filter.split(',') if args.filter is not None else None
 
@@ -617,7 +625,7 @@ def main():
 
     if args.list_components:
         walk_components(board, args.back,lambda lib, name, val, ref, pos:
-                        print_component(args.libraries, lib, name, val, ref, pos,
+                        print_component(args.libs, lib, name, val, ref, pos,
                                         remapping=remapping))
         sys.exit(0)
 
@@ -648,7 +656,7 @@ def main():
         "container": comp_cont,
         "placeholder": args.placeholder,
         "remapping": remapping,
-        "libraries": args.libraries,
+        "libraries": args.libs,
         "filter": args.filter
     }
 
