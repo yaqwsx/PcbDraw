@@ -4,6 +4,7 @@
     "silk": "#d8dae7",
     "pads": "#ede8b9",
     "outline": "#000000",
+    "vcut": "#f0f0f0",
     "highlight-on-top": false,
     "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
     "highlight-padding": 1.5

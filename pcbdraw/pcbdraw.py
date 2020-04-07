@@ -19,6 +19,7 @@ default_style = {
     "silk": "#f0f0f0",
     "pads": "#b5ae30",
     "outline": "#000000",
+    "vcut": "#bf2600",
     "highlight-on-top": False,
     "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
     "highlight-padding": 1.5,
@@ -329,30 +330,11 @@ def process_board_substrate_mask(container, name, source, colors):
                 item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff");
             mask.append(element)
 
-def get_board_substrate(board, colors, holes, back):
+def get_layers(board, colors, toPlot):
     """
-    Plots all front layers from the board and arranges them in a visually appealing style.
-    return SVG g element with the board substrate
+    Plot given layers, process them and return them as <g>
     """
-    toPlot = []
-    if(back):
-        toPlot = [
-            ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
-            ("copper", [pcbnew.B_Cu], process_board_substrate_layer),
-            ("pads", [pcbnew.B_Cu], process_board_substrate_layer),
-            ("pads-mask", [pcbnew.B_Mask], process_board_substrate_mask),
-            ("silk", [pcbnew.B_SilkS], process_board_substrate_layer),
-            ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
-    else:
-        toPlot = [
-            ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
-            ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
-            ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
-            ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
-            ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
-            ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
     container = etree.Element('g')
-    container.attrib["clip-path"] = "url(#cut-off)";
     tmp = tempfile.mkdtemp()
     pctl = pcbnew.PLOT_CONTROLLER(board)
     popt = pctl.GetPlotOptions()
@@ -376,12 +358,61 @@ def get_board_substrate(board, colors, holes, back):
         for svg_file in os.listdir(tmp):
             if svg_file.endswith("-" + f + ".svg"):
                 process(container, f, os.path.join(tmp, svg_file), colors)
-    print(tmp)
-    # shutil.rmtree(tmp)
+    shutil.rmtree(tmp)
+    return container
+
+def get_board_substrate(board, colors, holes, back):
+    """
+    Plots all front layers from the board and arranges them in a visually appealing style.
+    return SVG g element with the board substrate
+    """
+    toPlot = []
+    if(back):
+        toPlot = [
+            ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+            ("copper", [pcbnew.B_Cu], process_board_substrate_layer),
+            ("pads", [pcbnew.B_Cu], process_board_substrate_layer),
+            ("pads-mask", [pcbnew.B_Mask], process_board_substrate_mask),
+            ("silk", [pcbnew.B_SilkS], process_board_substrate_layer),
+            ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
+    else:
+        toPlot = [
+            ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+            ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
+            ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
+            ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
+            ("silk", [pcbnew.F_SilkS], process_board_substrate_layer),
+            ("outline", [pcbnew.Edge_Cuts], process_board_substrate_layer)]
+    container = etree.Element('g')
+    container.attrib["clip-path"] = "url(#cut-off)"
+    tmp = tempfile.mkdtemp()
+    pctl = pcbnew.PLOT_CONTROLLER(board)
+    popt = pctl.GetPlotOptions()
+    popt.SetOutputDirectory(tmp)
+    popt.SetScale(1)
+    popt.SetMirror(False)
+    try:
+        popt.SetPlotOutlineMode(False)
+    except:
+        # Method does not exist in older versions of KiCad
+        pass
+    popt.SetTextMode(pcbnew.PLOTTEXTMODE_STROKE)
+    for f, layers, _ in toPlot:
+        pctl.OpenPlotfile(f, pcbnew.PLOT_FORMAT_SVG, f)
+        for l in layers:
+            pctl.SetColorMode(False)
+            pctl.SetLayer(l)
+            pctl.PlotLayer()
+    pctl.ClosePlot()
+    for f, _, process in toPlot:
+        for svg_file in os.listdir(tmp):
+            if svg_file.endswith("-" + f + ".svg"):
+                process(container, f, os.path.join(tmp, svg_file), colors)
+    shutil.rmtree(tmp)
 
     if holes:
         container.append(get_hole_mask(board))
-        container.attrib["mask"] = "url(#hole-mask)";
+        container.attrib["mask"] = "url(#hole-mask)"
     return container
 
 def walk_components(board, back, export):
@@ -413,7 +444,7 @@ def get_hole_mask(board):
     mask = etree.SubElement(defs, "mask", id="hole-mask")
     container = etree.SubElement(mask, "g")
 
-    bb = board.ComputeBoundingBox();
+    bb = board.ComputeBoundingBox()
     bg = etree.SubElement(container, "rect", x="0", y="0", fill="white")
     bg.attrib["x"] = str(ki2dmil(bb.GetX()))
     bg.attrib["y"] = str(ki2dmil(bb.GetY()))
@@ -595,6 +626,7 @@ def main():
     parser.add_argument("--mirror", action="store_true", help="mirror the board")
     parser.add_argument("-a", "--highlight", help="comma separated list of components to highlight")
     parser.add_argument("-f", "--filter", help="comma separated list of components to show")
+    parser.add_argument("-v", "--vcuts", action="store_true", help="Render V-CUTS on the Cmts.User layer")
 
     args = parser.parse_args()
     args.libs = [adjust_lib_path(path) for path in args.libs.split(',')]
@@ -616,9 +648,7 @@ def main():
         sys.exit(1)
 
     try:
-        print("Please ignore following debug output of KiCAD Python API")
         board = pcbnew.LoadBoard(args.board)
-        print("End of KiCAD debug output")
     except IOError:
         print("Cannot open board " + args.board)
         sys.exit(1)
@@ -668,6 +698,8 @@ def main():
     }
 
     board_cont.append(get_board_substrate(board, style, not args.no_drillholes, args.back))
+    if args.vcuts:
+        board_cont.append(get_layers(board, style, [("vcut", [pcbnew.Cmts_User], process_board_substrate_layer)]))
 
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name, val, ref, pos, components, highlight))

@@ -3,23 +3,26 @@
 PcbDraw allows you to convert KiCad board files into a nice looking
 visualizations.
 
+## Installing
+
+You can install PcbDraw via pip:
+
+```
+pip install pcbdraw
+```
+
 ## Dependencies
 
-This script requires the `pcbnew` Python module (should come with KiCAD), the
-`argparse` and `lxlml` modules. No other dependencies are needed.
-
-PcbDraw also needs a module library to work. This library is maintained as a
-separate repository: [PcbDraw-Lib](https://github.com/yaqwsx/PcbDraw-Lib).
+This script requires the `pcbnew` Python module (should come with KiCAD). All
+the other dependencies are managed automatically.
 
 ## Usage
 
 Usage of PcbDraw is simple, just run:
 
 ```.{bash}
-./pcbdraw.py <libraries> <input_file> <output_file>
+pcbdraw  <input_file> <output_file>
 ```
-- `libraries` is a comma separated list of paths to directories containing
-  module libraries. Modules are component footprints in SVG format.
 - `output_file` is a path to an output SVG file
 - `input_file` is a path to an `*.kicad_pcb` file
 
@@ -29,6 +32,10 @@ the libraries, the script will output warning.
 
 There are several options for the script:
 
+- `--libs=<comma separated list>` specifies libraries to use. A library is a
+  directory mirroring KiCAD footprint structure -- however, instead of foot
+  print files it contains SVG files. First fit is used. Use can use `default` or
+  `eagle-default` to use built-in libraries.
 - `--style=<JSON_file>` specifies color theme for the board. Default is a green
   board, other styles can be found in the `styles` directories.
 - `--list-components` prints a list of all components from the front side of PCB.
@@ -84,7 +91,7 @@ components you have created.
 
 When specifying multiple module libraries, the first library path to match a
 given footprint is used for rendering. The lookup order is the same you
-wrote the `<libraries>` list.
+wrote the `--libs` option.
 
 ## Eagle Boards
 
