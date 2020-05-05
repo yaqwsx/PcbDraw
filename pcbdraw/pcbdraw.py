@@ -10,6 +10,10 @@ import sys
 import tempfile
 import numpy as np
 
+from wand.api import library
+from wand.color import Color
+from wand.image import Image
+
 import pcbnew
 from lxml import etree
 
@@ -560,20 +564,14 @@ def build_highlight(preset, width, height, pos, origin, ref):
     h.attrib["id"] = "h_" + ref
 
 def svg_to_png(infile, outfile, dpi=300):
-    import cairo
-    import gi
-    gi.require_version('Rsvg', '2.0')
-    from gi.repository import Rsvg
-
-    handle = Rsvg.Handle()
-    svg = handle.new_from_file(infile)
-    svg.set_dpi(dpi)
-    dim = svg.get_dimensions()
-    w, h = dim.width, dim.height
-    img =  cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
-    ctx = cairo.Context(img)
-    svg.render_cairo(ctx)
-    img.write_to_png(outfile)
+    with Image(resolution=300) as image:
+        with Color('transparent') as background_color:
+            library.MagickSetBackgroundColor(image.wand,
+                                            background_color.resource)
+        image.read(filename=infile, resolution=300)
+        png_image = image.make_blob("png32")
+        with open(outfile, "wb") as out:
+            out.write(png_image)
 
 def load_style(style_file):
     try:
@@ -714,7 +712,7 @@ def main():
     if args.output.endswith(".svg") or args.output.endswith(".SVG"):
         document.write(args.output)
     else:
-        with tempfile.NamedTemporaryFile() as tmp_f:
+        with tempfile.NamedTemporaryFile(suffix=".svg") as tmp_f:
             document.write(tmp_f)
             tmp_f.flush()
             svg_to_png(tmp_f.name, args.output)

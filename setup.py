@@ -27,7 +27,7 @@ setuptools.setup(
         "lxml",
         "mistune",
         "pybars3",
-        "pycairo"
+        "wand"
     ],
     zip_safe=False,
     include_package_data=True,
