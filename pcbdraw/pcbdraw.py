@@ -466,9 +466,9 @@ def get_hole_mask(board):
         except:
             # Newest nightly renames Pads to PadList
             pad = module.PadsList()
-        orient = module.GetOrientation()
         while pad:
             pos = pad.GetPosition()
+            padOrientation = pad.GetOrientation()
             pos.x = ki2dmil(pos.x)
             pos.y = ki2dmil(pos.y)
             size = list(map(ki2dmil, pad.GetDrillSize()))
@@ -487,7 +487,7 @@ def get_hole_mask(board):
                 el.attrib["stroke-width"] = str(stroke)
                 el.attrib["points"] = points
                 el.attrib["transform"] = "translate({} {}) rotate({})".format(
-                    pos.x, pos.y, -orient)
+                    pos.x, pos.y, -padOrientation / 10)
             pad = pad.Next()
         module = module.Next()
     return defs
