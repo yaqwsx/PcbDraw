@@ -660,7 +660,7 @@ def main():
             style = default_style
         remapping = load_remapping(args.remap)
     except RuntimeError as e:
-        print(e.message)
+        print(e)
         sys.exit(1)
 
     if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png"]:
