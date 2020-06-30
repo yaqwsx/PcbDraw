@@ -301,16 +301,18 @@ def get_board_polygon(svg_elements):
                 e = etree.Element("path", d=path, style="fill-rule=evenodd;")
                 return e
 
-def process_board_substrate_layer(container, name, source, colors):
+def process_board_substrate_layer(container, name, source, colors, boardsize):
     layer = etree.SubElement(container, "g", id="substrate-"+name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
     if name == "pads":
         layer.attrib["mask"] = "url(#pads-mask)"
+    if name == "silk":
+        layer.attrib["mask"] = "url(#pads-mask-silkscreen)"
     for element in extract_svg_content(read_svg_unique(source)):
         strip_fill_svg(element)
         layer.append(element)
 
-def process_board_substrate_base(container, name, source, colors):
+def process_board_substrate_base(container, name, source, colors, boardsize):
     clipPath = etree.SubElement(etree.SubElement(container, "defs"), "clipPath")
     clipPath.attrib["id"] = "cut-off"
     clipPath.append(get_board_polygon(extract_svg_content(read_svg_unique(source))))
@@ -324,15 +326,27 @@ def process_board_substrate_base(container, name, source, colors):
         strip_fill_svg(element)
         outline.append(element)
 
-def process_board_substrate_mask(container, name, source, colors):
+def process_board_substrate_mask(container, name, source, colors, boardsize):
     mask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
     mask.attrib["id"] = name
     for element in extract_svg_content(read_svg_unique(source)):
         for item in element.getiterator():
             if "style" in item.attrib:
                 # KiCAD plots in black, for mask we need white
-                item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff");
-            mask.append(element)
+                item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff")
+        mask.append(element)
+    silkMask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
+    silkMask.attrib["id"] = name + "-silkscreen"
+    for element in extract_svg_content(read_svg_unique(source)):
+        # KiCAD plots black, no need to change fill
+        silkMask.append(element)
+    bg = etree.SubElement(silkMask, "rect", attrib={
+        "x": str(ki2dmil(boardsize.GetX())),
+        "y": str(ki2dmil(boardsize.GetY())),
+        "width": str(ki2dmil(boardsize.GetWidth())),
+        "height": str(ki2dmil(boardsize.GetHeight())),
+        "fill": "white"
+    })
 
 def get_layers(board, colors, toPlot):
     """
@@ -345,6 +359,7 @@ def get_layers(board, colors, toPlot):
     popt.SetOutputDirectory(tmp)
     popt.SetScale(1)
     popt.SetMirror(False)
+    popt.SetSubtractMaskFromSilk(True)
     try:
         popt.SetPlotOutlineMode(False)
     except:
@@ -395,6 +410,7 @@ def get_board_substrate(board, colors, holes, back):
     popt.SetOutputDirectory(tmp)
     popt.SetScale(1)
     popt.SetMirror(False)
+    popt.SetSubtractMaskFromSilk(True)
     try:
         popt.SetPlotOutlineMode(False)
     except:
@@ -408,10 +424,11 @@ def get_board_substrate(board, colors, holes, back):
             pctl.SetLayer(l)
             pctl.PlotLayer()
     pctl.ClosePlot()
+    boardsize = board.ComputeBoundingBox()
     for f, _, process in toPlot:
         for svg_file in os.listdir(tmp):
             if svg_file.endswith("-" + f + ".svg"):
-                process(container, f, os.path.join(tmp, svg_file), colors)
+                process(container, f, os.path.join(tmp, svg_file), colors, boardsize)
     shutil.rmtree(tmp)
 
     if holes:
@@ -704,8 +721,8 @@ def main():
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name, val, ref, pos, components, highlight, args.silent))
 
-    #make another pass for search, and if found, render the back side of the component
-    #the function will search for file with extension ".back.svg"
+    # make another pass for search, and if found, render the back side of the component
+    # the function will search for file with extension ".back.svg"
     walk_components(board, not args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name+".back", val, ref, pos, components, highlight, args.silent))
 
