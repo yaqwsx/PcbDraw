@@ -62,6 +62,7 @@ don't have any effect on modules):
 
 ```.{json}
 {
+    "clad": "#9c6b28",
     "copper": "#417e5a",
     "board": "#4ca06c",
     "silk": "#f0f0f0",

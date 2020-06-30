@@ -23,6 +23,7 @@ default_style = {
     "silk": "#f0f0f0",
     "pads": "#b5ae30",
     "outline": "#000000",
+    "clad": "#9c6b28",
     "vcut": "#bf2600",
     "highlight-on-top": False,
     "highlight-style": "stroke:none;fill:#ff0000;opacity:0.5;",
@@ -389,6 +390,7 @@ def get_board_substrate(board, colors, holes, back):
     if(back):
         toPlot = [
             ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+            ("clad", [pcbnew.B_Mask], process_board_substrate_layer),
             ("copper", [pcbnew.B_Cu], process_board_substrate_layer),
             ("pads", [pcbnew.B_Cu], process_board_substrate_layer),
             ("pads-mask", [pcbnew.B_Mask], process_board_substrate_mask),
@@ -397,6 +399,7 @@ def get_board_substrate(board, colors, holes, back):
     else:
         toPlot = [
             ("board", [pcbnew.Edge_Cuts], process_board_substrate_base),
+            ("clad", [pcbnew.F_Mask], process_board_substrate_layer),
             ("copper", [pcbnew.F_Cu], process_board_substrate_layer),
             ("pads", [pcbnew.F_Cu], process_board_substrate_layer),
             ("pads-mask", [pcbnew.F_Mask], process_board_substrate_mask),
@@ -596,7 +599,7 @@ def load_style(style_file):
             style = json.load(f)
     except IOError:
         raise RuntimeError("Cannot open style " + style_file)
-    required = set(["copper", "board", "silk", "pads", "outline",
+    required = set(["copper", "board", "clad", "silk", "pads", "outline",
         "highlight-style", "highlight-offset", "highlight-on-top"])
     missing = required - set(style.keys())
     if missing:
