@@ -374,10 +374,11 @@ def get_layers(board, colors, toPlot):
             pctl.SetLayer(l)
             pctl.PlotLayer()
     pctl.ClosePlot()
+    boardsize = board.ComputeBoundingBox()
     for f, _, process in toPlot:
         for svg_file in os.listdir(tmp):
             if svg_file.endswith("-" + f + ".svg"):
-                process(container, f, os.path.join(tmp, svg_file), colors)
+                process(container, f, os.path.join(tmp, svg_file), colors, boardsize)
     shutil.rmtree(tmp)
     return container
 
