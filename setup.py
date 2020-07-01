@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="PcbDraw",
-    version="0.3.0",
+    version="0.4.0",
     author="Jan Mrázek",
     author_email="email@honzamrazek.cz",
     description="Utility to produce nice looking drawings of KiCAD boards",
