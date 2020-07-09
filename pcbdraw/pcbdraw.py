@@ -483,12 +483,11 @@ def get_hole_mask(board):
         if module.GetPadCount() == 0:
             module = module.Next()
             continue
-        pad = module.Pads()
         try:
-            pad.GetPosition()
-        except:
-            # Newest nightly renames Pads to PadList
             pad = module.PadsList()
+        except AttributeError:
+            # Older interfase used Pads()
+            pad = module.Pads()
         while pad:
             pos = pad.GetPosition()
             padOrientation = pad.GetOrientation()
