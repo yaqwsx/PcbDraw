@@ -17,6 +17,9 @@ from wand.image import Image
 import pcbnew
 from lxml import etree
 
+GLOBAL_DATA_DIR = '/usr/share/pcbdraw'
+STYLES_SUBDIR = 'styles'
+FOOTPRINTS_SUBDIR = 'footprints'
 PKG_BASE = os.path.dirname(__file__)
 
 default_style = {
@@ -603,10 +606,31 @@ def svg_to_bitmap(infile, outfile, dpi=300):
         with open(outfile, "wb") as out:
             out.write(bin_blob)
 
+def find_data_file(name, ext, subdir):
+    if os.path.isfile(name):
+        return name
+    # Not a file here, needs extension?
+    ln = len(ext)
+    if name[-ln:] != ext:
+        name += ext
+        if os.path.isfile(name):
+            return name
+    # With the sources?
+    local_name = os.path.join(PKG_BASE, subdir, name)
+    if os.path.isfile(local_name):
+        return local_name
+    # System level?
+    global_name = os.path.join(GLOBAL_DATA_DIR, subdir, name)
+    if os.path.isfile(global_name):
+        return global_name
+    raise RuntimeError("Missing '" + subdir + "' " + name)
+
 def load_style(style_file):
-    STYLES = os.path.join(PKG_BASE, "styles")
     if style_file.startswith("builtin:"):
+        STYLES = os.path.join(PKG_BASE, "styles")
         style_file = os.path.join(STYLES, style_file[len("builtin:"):])
+    else:
+        style_file = find_data_file(style_file, '.json', STYLES_SUBDIR)
     try:
         with open(style_file, "r") as f:
             style = json.load(f)
@@ -635,11 +659,13 @@ def load_remapping(remap_file):
         raise RuntimeError("Cannot open remapping file " + remap_file)
 
 def adjust_lib_path(path):
+    base_local = os.path.join(PKG_BASE, FOOTPRINTS_SUBDIR)
+    base_global = os.path.join(GLOBAL_DATA_DIR, FOOTPRINTS_SUBDIR)
     if path == "default" or path == "kicad-default":
-        return os.path.join(PKG_BASE, "footprints", "KiCAD-base")
+        return [os.path.join(base_local, "KiCAD-base"), os.path.join(base_global, "KiCAD-base")]
     if path == "eagle-default":
-        return os.path.join(PKG_BASE, "footprints", "Eagle-export")
-    return path
+        return [os.path.join(base_local, "Eagle-export"), os.path.join(base_global, "Eagle-export")]
+    return [path]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -664,7 +690,10 @@ def main():
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
 
     args = parser.parse_args()
-    args.libs = [adjust_lib_path(path) for path in args.libs.split(',')]
+    libs = []
+    for path in args.libs.split(','):
+        libs.extend(adjust_lib_path(path))
+    args.libs = libs
     args.highlight = args.highlight.split(',') if args.highlight is not None else []
     args.filter = args.filter.split(',') if args.filter is not None else None
 
