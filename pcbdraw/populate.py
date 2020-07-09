@@ -213,19 +213,16 @@ def relativize_header_paths(header, to):
         x = os.path.join(to, header[key])
         header[key] = os.path.normpath(x)
     if "params" in header:
-        x = header["params"]
-        newlist = []
-        for key in ["--style", "--remap"]:
-            c = find_command(x, key)
-            if c is None:
-                continue
-            y = c.split(" ")
-            command, arg = y[0], y[1]
-            if os.path.isabs(arg):
-                continue
-            c = command + " " + os.path.normpath(os.path.join(to, arg))
-            newlist.append(c)
-        header["params"] = newlist
+        for i, arg in enumerate(header["params"]):
+            for key in ["--style", "--remap"]:
+                c = find_command(arg, key)
+                if c is None:
+                    continue
+                y = c.split(" ")
+                command, arg = y[0], y[1]
+                if os.path.isabs(arg):
+                    continue
+                header["params"][i] = command + " " + os.path.normpath(os.path.join(to, arg))
     return header
 
 def merge_args(args, header):
