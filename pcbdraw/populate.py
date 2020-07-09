@@ -131,7 +131,7 @@ def load_content(filename):
         if content.startswith("---"):
             end = content.find("...")
             if end != -1:
-                header = yaml.load(content[3:end])
+                header = yaml.load(content[3:end], Loader=yaml.FullLoader)
                 content = content[end+3:]
     return header, content
 
