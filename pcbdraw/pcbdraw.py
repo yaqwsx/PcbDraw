@@ -584,15 +584,23 @@ def build_highlight(preset, width, height, pos, origin, ref):
         -math.degrees(pos[2]), -origin[0], -origin[1])
     h.attrib["id"] = "h_" + ref
 
-def svg_to_png(infile, outfile, dpi=300):
-    with Image(resolution=300) as image:
+def svg_to_bitmap(infile, outfile, dpi=300):
+    with Image(resolution=dpi) as image:
         with Color('transparent') as background_color:
             library.MagickSetBackgroundColor(image.wand,
                                             background_color.resource)
-        image.read(filename=infile, resolution=300)
-        png_image = image.make_blob("png32")
+        image.read(filename=infile, resolution=dpi)
+        _, ext = os.path.splitext(outfile)
+        print(ext)
+        if ext.lower() == ".png":
+            type = "png32"
+        elif ext.lower() in [".jpg", ".jpeg"]:
+            type = "jpeg"
+        else:
+            raise RuntimeError(f"Unsupported output image type {ext}")
+        bin_blob = image.make_blob(type)
         with open(outfile, "wb") as out:
-            out.write(png_image)
+            out.write(bin_blob)
 
 def load_style(style_file):
     try:
@@ -648,6 +656,7 @@ def main():
     parser.add_argument("-f", "--filter", help="comma separated list of components to show")
     parser.add_argument("-v", "--vcuts", action="store_true", help="Render V-CUTS on the Cmts.User layer")
     parser.add_argument("--silent", action="store_true", help="Silent warning messages about missing footprints")
+    parser.add_argument("--dpi", help="DPI for bitmap output", type=int, default=300)
 
     args = parser.parse_args()
     args.libs = [adjust_lib_path(path) for path in args.libs.split(',')]
@@ -664,8 +673,8 @@ def main():
         print(e)
         sys.exit(1)
 
-    if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png"]:
-        print("Output can be either an SVG or PNG file")
+    if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png", ".jpg", ".jpeg"]:
+        print("Output can be either an SVG, PNG or JPG file")
         sys.exit(1)
 
     try:
@@ -736,7 +745,7 @@ def main():
         with tempfile.NamedTemporaryFile(suffix=".svg") as tmp_f:
             document.write(tmp_f)
             tmp_f.flush()
-            svg_to_png(tmp_f.name, args.output)
+            svg_to_bitmap(tmp_f.name, args.output, dpi=args.dpi)
 
 if __name__ == '__main__':
     main()

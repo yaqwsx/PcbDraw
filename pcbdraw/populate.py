@@ -183,9 +183,6 @@ def generate_images(content, boardfilename, libs, parameters, name, outdir):
     return content
 
 def generate_image(boardfilename, libs, side, components, active, parameters, outputfile):
-    svgfilename = os.path.splitext(outputfile)
-    svgfilename, ext = svgfilename[0] + ".svg", svgfilename[1]
-
     command = ["pcbdraw", "-f", ",".join(components), "-a", ",".join(active)]
     if side.startswith("back"):
         command.append("-b")
@@ -193,7 +190,7 @@ def generate_image(boardfilename, libs, side, components, active, parameters, ou
     if libs:
         command.append("--libs=" + libs)
     command.append(boardfilename)
-    command.append(svgfilename)
+    command.append(outputfile)
     try:
         output = subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
