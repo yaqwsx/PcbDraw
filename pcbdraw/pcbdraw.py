@@ -17,6 +17,8 @@ from wand.image import Image
 import pcbnew
 from lxml import etree
 
+PKG_BASE = os.path.dirname(__file__)
+
 default_style = {
     "copper": "#417e5a",
     "board": "#4ca06c",
@@ -603,6 +605,9 @@ def svg_to_bitmap(infile, outfile, dpi=300):
             out.write(bin_blob)
 
 def load_style(style_file):
+    STYLES = os.path.join(PKG_BASE, "styles")
+    if style_file.startswith("builtin:"):
+        style_file = os.path.join(STYLES, style_file[len("builtin:"):])
     try:
         with open(style_file, "r") as f:
             style = json.load(f)

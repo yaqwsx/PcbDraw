@@ -34,12 +34,14 @@ the libraries, the script will output warning.
 
 There are several options for the script:
 
-- `--libs=<comma separated list>` specifies libraries to use. A library is a
+- `--libs <comma separated list>` specifies libraries to use. A library is a
   directory mirroring KiCAD footprint structure -- however, instead of foot
   print files it contains SVG files. First fit is used. Use can use `default` or
   `eagle-default` to use built-in libraries.
-- `--style=<JSON_file>` specifies color theme for the board. Default is a green
-  board, other styles can be found in the `styles` directories.
+- `--style <JSON_file>` specifies color theme for the board. Default is a green
+  board, other styles can be found in the `styles` directories. To specify one
+  of the built-in styles, prefix it with `builtin:`. E.g., `--style
+  builtin:oshpark-purple.json`
 - `--list-components` prints a list of all components from the front side of PCB.
   Doesn't produce drawing.
 - `--placeholder` shows a red square in the drawing for missing modules.
