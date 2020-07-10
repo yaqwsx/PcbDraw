@@ -593,7 +593,6 @@ def svg_to_bitmap(infile, outfile, dpi=300):
                                             background_color.resource)
         image.read(filename=infile, resolution=dpi)
         _, ext = os.path.splitext(outfile)
-        print(ext)
         if ext.lower() == ".png":
             type = "png32"
         elif ext.lower() in [".jpg", ".jpeg"]:
