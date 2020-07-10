@@ -215,7 +215,7 @@ def relativize_header_paths(header, to):
     if "params" in header:
         for i, arg in enumerate(header["params"]):
             for key in ["--style", "--remap"]:
-                c = find_command(arg, key)
+                c = find_command([arg], key)
                 if c is None:
                     continue
                 y = c.split(" ")
