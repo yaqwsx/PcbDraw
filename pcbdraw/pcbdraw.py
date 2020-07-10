@@ -612,7 +612,8 @@ def load_style(style_file):
     except IOError:
         raise RuntimeError("Cannot open style " + style_file)
     required = set(["copper", "board", "clad", "silk", "pads", "outline",
-        "highlight-style", "highlight-offset", "highlight-on-top"])
+        "vcut", "highlight-style", "highlight-offset", "highlight-on-top",
+        "highlight-padding"])
     missing = required - set(style.keys())
     if missing:
         raise RuntimeError("Missing following keys in style {}: {}"
