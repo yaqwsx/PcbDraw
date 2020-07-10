@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+import sys
+import os
+PKG_BASE = os.path.dirname(__file__)
+# Give more priority to local modules than installed versions
+sys.path.insert(0, os.path.dirname(os.path.abspath(PKG_BASE)))
 
 import mistune
 import pcbdraw.mdrenderer
@@ -7,8 +12,6 @@ import codecs
 import pybars
 import yaml
 import argparse
-import sys
-import os
 import subprocess
 import sysconfig
 from copy import deepcopy
@@ -187,7 +190,9 @@ def generate_images(content, boardfilename, libs, parameters, name, outdir):
     return content
 
 def generate_image(boardfilename, libs, side, components, active, parameters, outputfile):
-    command = ["pcbdraw", "-f", ",".join(components), "-a", ",".join(active)]
+    # Use the pcbdraw.py script from the same point this script was executed
+    script = os.path.join(PKG_BASE, "pcbdraw.py")
+    command = ['python3', script, "-f", ",".join(components), "-a", ",".join(active)]
     if side.startswith("back"):
         command.append("-b")
     command += flatten(map(lambda x: x.split(" ", 1), parameters))
