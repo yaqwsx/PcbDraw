@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-PKG_BASE = os.path.dirname(__file__)
-
 import mistune
 import pcbdraw.mdrenderer
 import re
@@ -12,10 +10,11 @@ import argparse
 import sys
 import os
 import subprocess
+import sysconfig
 from copy import deepcopy
 
-GLOBAL_DATA_DIR = '/usr/share/pcbdraw'
 TEMPLATES_SUBDIR = 'templates'
+data_path = [os.path.dirname(__file__)]
 
 
 class PcbDrawInlineLexer(mistune.InlineLexer):
@@ -274,15 +273,22 @@ def find_data_file(name, ext, subdir):
         name += ext
         if os.path.isfile(name):
             return name
-    # With the sources?
-    local_name = os.path.join(PKG_BASE, subdir, name)
-    if os.path.isfile(local_name):
-        return local_name
-    # System level?
-    global_name = os.path.join(GLOBAL_DATA_DIR, subdir, name)
-    if os.path.isfile(global_name):
-        return global_name
+    # Try in the data path
+    for p in data_path:
+        fn = os.path.join(p, subdir, name)
+        if os.path.isfile(fn):
+            return fn
     raise RuntimeError("Missing '" + subdir + "' " + name)
+
+def setup_data_path():
+    global data_path
+    share = os.path.join('share', 'pcbdraw')
+    if os.name == 'posix':
+        data_path.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
+        data_path.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
+    elif os.name == 'nt':
+        data_path.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
+        data_path.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -297,6 +303,7 @@ def main():
 
     args = parser.parse_args()
 
+    setup_data_path()
     try:
         header, content = load_content(args.input)
     except IOError:
