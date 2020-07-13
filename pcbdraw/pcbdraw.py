@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 import tempfile
+import sysconfig
 import numpy as np
 
 from wand.api import library
@@ -21,6 +22,7 @@ GLOBAL_DATA_DIR = '/usr/share/pcbdraw'
 STYLES_SUBDIR = 'styles'
 FOOTPRINTS_SUBDIR = 'footprints'
 PKG_BASE = os.path.dirname(__file__)
+data_path = [PKG_BASE]
 
 default_style = {
     "copper": "#417e5a",
@@ -615,14 +617,11 @@ def find_data_file(name, ext, subdir):
         name += ext
         if os.path.isfile(name):
             return name
-    # With the sources?
-    local_name = os.path.join(PKG_BASE, subdir, name)
-    if os.path.isfile(local_name):
-        return local_name
-    # System level?
-    global_name = os.path.join(GLOBAL_DATA_DIR, subdir, name)
-    if os.path.isfile(global_name):
-        return global_name
+    # Try in the data path
+    for p in data_path:
+        fn = os.path.join(p, subdir, name)
+        if os.path.isfile(fn):
+            return fn
     raise RuntimeError("Missing '" + subdir + "' " + name)
 
 def load_style(style_file):
@@ -659,13 +658,21 @@ def load_remapping(remap_file):
         raise RuntimeError("Cannot open remapping file " + remap_file)
 
 def adjust_lib_path(path):
-    base_local = os.path.join(PKG_BASE, FOOTPRINTS_SUBDIR)
-    base_global = os.path.join(GLOBAL_DATA_DIR, FOOTPRINTS_SUBDIR)
     if path == "default" or path == "kicad-default":
-        return [os.path.join(base_local, "KiCAD-base"), os.path.join(base_global, "KiCAD-base")]
+        return [os.path.join(p, FOOTPRINTS_SUBDIR, "KiCAD-base") for p in data_path]
     if path == "eagle-default":
-        return [os.path.join(base_local, "Eagle-export"), os.path.join(base_global, "Eagle-export")]
+        return [os.path.join(p, FOOTPRINTS_SUBDIR, "Eagle-export") for p in data_path]
     return [path]
+
+def setup_data_path():
+    global data_path
+    share = os.path.join('share', 'pcbdraw')
+    if os.name == 'posix':
+        data_path.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
+        data_path.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
+    elif os.name == 'nt':
+        data_path.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
+        data_path.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -690,6 +697,7 @@ def main():
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
 
     args = parser.parse_args()
+    setup_data_path()
     libs = []
     for path in args.libs.split(','):
         libs.extend(adjust_lib_path(path))
