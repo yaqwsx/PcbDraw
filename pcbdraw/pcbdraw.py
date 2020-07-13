@@ -530,7 +530,7 @@ def print_component(paths, lib, name, value, ref, pos, remapping={}):
         ref, lib, name, pos[0], pos[1], math.degrees(pos[2]), f if f else "Not found")
     print(msg)
 
-def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, warn_back):
+def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, no_warn_back):
     if not name:
         return
     if comp["filter"] is not None and ref not in comp["filter"]:
@@ -538,7 +538,7 @@ def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, 
     f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
     if not f:
         if not silent:
-            if name[-5:] != '.back' or warn_back:
+            if name[-5:] != '.back' or not no_warn_back:
                 print("Warning: component '{}' for footprint '{}' from library '{}' was not found".format(name, ref, lib))
         if comp["placeholder"]:
             etree.SubElement(comp["container"], "rect", x=str(ki2dmil(pos[0]) - 150), y=str(ki2dmil(pos[1]) - 150),
@@ -661,7 +661,7 @@ def main():
     parser.add_argument("-v", "--vcuts", action="store_true", help="Render V-CUTS on the Cmts.User layer")
     parser.add_argument("--silent", action="store_true", help="Silent warning messages about missing footprints")
     parser.add_argument("--dpi", help="DPI for bitmap output", type=int, default=300)
-    parser.add_argument("--warn-back", action="store_true", help="Show warnings about back footprints")
+    parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
 
     args = parser.parse_args()
     args.libs = [adjust_lib_path(path) for path in args.libs.split(',')]
@@ -737,12 +737,12 @@ def main():
         board_cont.append(get_layers(board, style, [("vcut", [pcbnew.Cmts_User], process_board_substrate_layer)]))
 
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
-        component_from_library(lib, name, val, ref, pos, components, highlight, args.silent, args.warn_back))
+        component_from_library(lib, name, val, ref, pos, components, highlight, args.silent, args.no_warn_back))
 
     # make another pass for search, and if found, render the back side of the component
     # the function will search for file with extension ".back.svg"
     walk_components(board, not args.back, lambda lib, name, val, ref, pos:
-        component_from_library(lib, name+".back", val, ref, pos, components, highlight, args.silent, args.warn_back))
+        component_from_library(lib, name+".back", val, ref, pos, components, highlight, args.silent, args.no_warn_back))
 
     if args.output.endswith(".svg") or args.output.endswith(".SVG"):
         document.write(args.output)
