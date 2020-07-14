@@ -283,12 +283,20 @@ def find_data_file(name, ext, subdir):
 def setup_data_path():
     global data_path
     share = os.path.join('share', 'pcbdraw')
+    entries = len(data_path)
+    scheme_names = sysconfig.get_scheme_names()
     if os.name == 'posix':
-        data_path.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
-        data_path.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
+        if 'posix_user' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
+        if 'posix_prefix' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
     elif os.name == 'nt':
-        data_path.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
-        data_path.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
+        if 'nt_user' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
+        if 'nt' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
+    if len(data_path) == entries:
+        data_path.append(os.path.join(sysconfig.get_path('data'), share))
 
 def main():
     parser = argparse.ArgumentParser()
