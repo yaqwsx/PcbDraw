@@ -22,13 +22,12 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        "argparse",
         "numpy",
         "lxml",
         "mistune",
         "pybars3",
         "wand",
-        "pyaml"
+        "pyyaml"
     ],
     zip_safe=False,
     include_package_data=True,
