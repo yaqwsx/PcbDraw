@@ -10,7 +10,11 @@ import argparse
 import sys
 import os
 import subprocess
+import sysconfig
 from copy import deepcopy
+
+TEMPLATES_SUBDIR = 'templates'
+data_path = [os.path.dirname(__file__)]
 
 
 class PcbDrawInlineLexer(mistune.InlineLexer):
@@ -210,8 +214,11 @@ def relativize_header_paths(header, to):
             continue
         if os.path.isabs(header[key]) or header[key].startswith("builtin:"):
             continue
+        if key == 'libs' and header[key] in ["default", "kicad-default", "eagle-default"]:
+            continue
         x = os.path.join(to, header[key])
-        header[key] = os.path.normpath(x)
+        if os.path.isfile(x):
+            header[key] = os.path.normpath(x)
     if "params" in header:
         for i, arg in enumerate(header["params"]):
             for key in ["--style", "--remap"]:
@@ -257,6 +264,40 @@ def validate_args(args):
     if args["params"] is None:
         args["params"] = []
 
+def find_data_file(name, ext, subdir):
+    if os.path.isfile(name):
+        return name
+    # Not a file here, needs extension?
+    ln = len(ext)
+    if name[-ln:] != ext:
+        name += ext
+        if os.path.isfile(name):
+            return name
+    # Try in the data path
+    for p in data_path:
+        fn = os.path.join(p, subdir, name)
+        if os.path.isfile(fn):
+            return fn
+    raise RuntimeError("Missing '" + subdir + "' " + name)
+
+def setup_data_path():
+    global data_path
+    share = os.path.join('share', 'pcbdraw')
+    entries = len(data_path)
+    scheme_names = sysconfig.get_scheme_names()
+    if os.name == 'posix':
+        if 'posix_user' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
+        if 'posix_prefix' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
+    elif os.name == 'nt':
+        if 'nt_user' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
+        if 'nt' in scheme_names:
+            data_path.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
+    if len(data_path) == entries:
+        data_path.append(os.path.join(sysconfig.get_path('data'), share))
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("input", help="source file")
@@ -264,12 +305,13 @@ def main():
     parser.add_argument("-p", "--params", help="additional flags for PcbDraw")
     parser.add_argument("-b", "--board", help=".kicad_pcb file with a board")
     parser.add_argument("-i", "--img_name", help="image name template, should contain exactly one {{}}")
-    parser.add_argument("-t", "--template", help="handlebars template for HTML output")
+    parser.add_argument("-t", "--template", help="handlebars template for HTML output", default='simple')
     parser.add_argument("-f", "--type", help="output type: md or html")
     parser.add_argument("-l", "--libs", help="libraries for PcbDraw")
 
     args = parser.parse_args()
 
+    setup_data_path()
     try:
         header, content = load_content(args.input)
     except IOError:
@@ -288,7 +330,7 @@ def main():
         renderer = Renderer(mistune.Renderer)
         outputfile = "index.html"
         try:
-            template = read_template(args["template"])
+            template = read_template(find_data_file(args["template"], '.handlebars', TEMPLATES_SUBDIR))
         except IOError:
             print("Cannot open template file " + args["template"])
             sys.exit(1)
