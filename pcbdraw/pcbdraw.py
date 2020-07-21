@@ -682,7 +682,17 @@ def setup_data_path():
         data_path.append(os.path.join(sysconfig.get_path('data'), share))
 
 def main():
-    parser = argparse.ArgumentParser()
+    setup_data_path()
+    epilog = "Searching for styles on: "
+    c = len(data_path)
+    for i, path in enumerate(data_path):
+        epilog += "'"+os.path.join(path, 'styles')+"'"
+        if i == c-2:
+            epilog += " and "
+        elif i != c-1:
+            epilog += ", "
+
+    parser = argparse.ArgumentParser(epilog=epilog)
     parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("board", help=".kicad_pcb file to draw")
     parser.add_argument("output", help="destination for final SVG or PNG file")
@@ -704,7 +714,6 @@ def main():
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
 
     args = parser.parse_args()
-    setup_data_path()
     libs = []
     for path in args.libs.split(','):
         libs.extend(adjust_lib_path(path))
