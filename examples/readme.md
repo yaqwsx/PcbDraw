@@ -6,6 +6,8 @@ The script will download a simple demo board by RoboticsBrno.
 
 # Example usages of PcbDraw
 
+All the examples assumes the current directory is the root of the repository.
+
 To render the board invoke:
 
 ```
@@ -27,7 +29,7 @@ pcbdraw -b examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pc
 To use different style:
 
 ```
-pcbdraw --style pcbdraw/styles/oshpark-purple.json examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw --style oshpark-purple examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 To render only the board without components:
