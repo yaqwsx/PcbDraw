@@ -7,18 +7,20 @@ with images suitable for GitHub wiki.
 It allows you to write text, incrementally add new components to the board and
 highlight newly added components.
 
+## Installation
+
+This is currently part of PcbDraw, read the PcbDraw installation.
+
 ## Dependencies
 
-Populate requires PcbDraw and also modules `mistune` and `py3bar`. If you
-also want to use feature to convert images from vector to bitmap, you need Caira
-and Rsvg.
+Dependencies are handled by PcbDraw installation.
 
 ## Usage
 
 Usage of Populate is simple, just run:
 
 ```.{bash}
-./populate.py <source_file> <output_directory>
+populate <source_file> <output_directory>
 ```
 - `source_file` is a markdown source code with a yaml header defining the guide
 - `output_directory` is the directory for generated files. It will generate a
