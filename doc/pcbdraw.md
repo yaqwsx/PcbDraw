@@ -11,12 +11,19 @@ You can install PcbDraw via pip:
 pip install pcbdraw
 ```
 
-To produce PNG images, you also need package "libmagickwand-dev".
-
 ## Dependencies
 
 This script requires the `pcbnew` Python module (should come with KiCAD). All
-the other dependencies are managed automatically.
+the other dependencies (numpy, lxmlm, mistune, wand, pybars3, etc,) are managed automatically.
+
+## No installation
+
+You can run the script without installing, just invoke the `pcbdraw.py`.
+As an example, from the root of the git repo you can use:
+
+```
+pcbdraw/pcbdraw.py
+```
 
 ## Usage
 

@@ -4,7 +4,7 @@ params:
 img_name: img/populating_{}.png
 type: md
 board: ../ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
-libs: ../PcbDraw-Lib/KiCAD-base
+libs: kicad-default
 ...
 
 # Demo population manual

@@ -2,10 +2,10 @@
 params:
     - --remap remap.json
 img_name: img/populating_{}.png
-template: ../../templates/simple.handlebars
+template: ../../pcbdraw/templates/simple.handlebars
 type: html
 board: ../ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
-libs: ../PcbDraw-Lib/KiCAD-base
+libs: kicad-default
 ...
 
 # Demo population manual
