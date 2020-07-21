@@ -9,7 +9,7 @@ highlight newly added components.
 
 ## Installation
 
-This is currently part of PcbDraw, read the PcbDraw installation.
+This is currently part of PcbDraw, read the [PcbDraw](pcbdraw.md) installation.
 
 ## Dependencies
 
