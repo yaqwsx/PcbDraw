@@ -64,6 +64,22 @@ There are several options for the script:
 - `--highlight` take a comma separated list of components and highlight them
 - `--filter` take a comma separated list of components and show only them
 
+## Path to styles and libraries
+
+The styles and libraries can be installed in various locations. PcbDraw will
+look for them in the following places:
+
+- 1st: the same directory where the script is installed. As an example take
+  a look at the repo layout.
+- 2nd: the user local data directory. The script adds `share/pcbdraw`. As an
+  example, on Linux systems the path for styles will be:
+  `~/.local/share/pcbdraw/styles`
+- 3rd: the system data dyrectory. The script adds `share/pcbdraw`. As an
+  example, on Linux systems the path for styles will be:
+  `/usr/share/pcbdraw/styles`
+
+The exact paths used on your system are displayed by the `--help` option.
+
 ## Writing Custom Styles
 
 Style is a JSON file contain color definitions for the board substrate (they
