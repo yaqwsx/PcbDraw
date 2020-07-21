@@ -2,7 +2,7 @@
 params:
     - --remap remap.json
 img_name: img/populating_{}.png
-template: ../../pcbdraw/templates/simple.handlebars
+template: simple
 type: html
 board: ../ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
 libs: kicad-default
