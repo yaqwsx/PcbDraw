@@ -25,8 +25,9 @@ Usage of PcbDraw is simple, just run:
 ```.{bash}
 pcbdraw  <input_file> <output_file>
 ```
-- `output_file` is a path to an output SVG file
 - `input_file` is a path to an `*.kicad_pcb` file
+- `output_file` is a path to an output SVG file
+
 
 The script will output several debug messages of KiCAD Python API you can
 ignore. I haven't found a way to disable them. If there is a missing module in
