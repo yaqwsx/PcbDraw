@@ -18,6 +18,8 @@ from wand.image import Image
 import pcbnew
 from lxml import etree
 
+from pcbdraw import __version__
+
 STYLES_SUBDIR = 'styles'
 FOOTPRINTS_SUBDIR = 'footprints'
 PKG_BASE = os.path.dirname(__file__)
@@ -309,7 +311,7 @@ def get_board_polygon(svg_elements):
                 return e
 
 def process_board_substrate_layer(container, name, source, colors, boardsize):
-    layer = etree.SubElement(container, "g", id="substrate-"+name,
+    layer = etree.SubElement(container, "g", id="substrate-" + name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
     if name == "pads":
         layer.attrib["mask"] = "url(#pads-mask)"
@@ -693,6 +695,7 @@ def main():
             epilog += ", "
 
     parser = argparse.ArgumentParser(epilog=epilog)
+    parser.add_argument("--version", action="version", version=f"PcbDraw {__version__}")
     parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("board", help=".kicad_pcb file to draw")
     parser.add_argument("output", help="destination for final SVG or PNG file")
