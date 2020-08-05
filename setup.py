@@ -28,7 +28,9 @@ setuptools.setup(
         "mistune",
         "pybars3",
         "wand",
-        "pyyaml",
+        "pyyaml"
+    ],
+    setup_requires=[
         "versioneer"
     ],
     zip_safe=False,
