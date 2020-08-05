@@ -305,7 +305,7 @@ def get_board_polygon(svg_elements):
                 outline = [elements[0]]
                 elements = elements[1:]
             else:
-                e = etree.Element("path", d=path, style="fill-rule=evenodd;")
+                e = etree.Element("path", d=path, style="fill-rule: evenodd;")
                 return e
 
 def process_board_substrate_layer(container, name, source, colors, boardsize):
