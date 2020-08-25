@@ -18,11 +18,13 @@ from wand.image import Image
 import pcbnew
 from lxml import etree
 
+# Give more priority to local modules than installed versions
+PKG_BASE = os.path.dirname(__file__)
+sys.path.insert(0, os.path.dirname(os.path.abspath(PKG_BASE)))
 from pcbdraw import __version__
 
 STYLES_SUBDIR = 'styles'
 FOOTPRINTS_SUBDIR = 'footprints'
-PKG_BASE = os.path.dirname(__file__)
 data_path = [PKG_BASE]
 
 default_style = {
