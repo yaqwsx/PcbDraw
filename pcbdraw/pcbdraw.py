@@ -42,6 +42,16 @@ default_style = {
 }
 
 float_re = r'([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)'
+adjust_to_edge = False
+board_bbox = None
+
+
+def get_board_size(board):
+    global board_bbox
+    if board_bbox is None:
+        board_bbox = board.ComputeBoundingBox(aBoardEdgesOnly=adjust_to_edge)
+    return board_bbox
+
 
 class SvgPathItem:
     def __init__(self, path):
@@ -384,7 +394,7 @@ def get_layers(board, colors, toPlot):
             pctl.SetLayer(l)
             pctl.PlotLayer()
     pctl.ClosePlot()
-    boardsize = board.ComputeBoundingBox()
+    boardsize = get_board_size(board)
     for f, _, process in toPlot:
         for svg_file in os.listdir(tmp):
             if svg_file.endswith("-" + f + ".svg"):
@@ -438,7 +448,7 @@ def get_board_substrate(board, colors, holes, back):
             pctl.SetLayer(l)
             pctl.PlotLayer()
     pctl.ClosePlot()
-    boardsize = board.ComputeBoundingBox()
+    boardsize = get_board_size(board)
     for f, _, process in toPlot:
         for svg_file in os.listdir(tmp):
             if svg_file.endswith("-" + f + ".svg"):
@@ -479,7 +489,7 @@ def get_hole_mask(board):
     mask = etree.SubElement(defs, "mask", id="hole-mask")
     container = etree.SubElement(mask, "g")
 
-    bb = board.ComputeBoundingBox()
+    bb = get_board_size(board)
     bg = etree.SubElement(container, "rect", x="0", y="0", fill="white")
     bg.attrib["x"] = str(ki2dmil(bb.GetX()))
     bg.attrib["y"] = str(ki2dmil(bb.GetY()))
@@ -717,6 +727,8 @@ def main():
     parser.add_argument("--silent", action="store_true", help="Silent warning messages about missing footprints")
     parser.add_argument("--dpi", help="DPI for bitmap output", type=int, default=300)
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
+    parser.add_argument("-r","--remove-hidden", action="store_true", help="Remove board drawings in hidden layers")
+    parser.add_argument("-e","--adjust-to-edge", action="store_true", help="Adjust size to the board edge")
 
     args = parser.parse_args()
     libs = []
@@ -746,13 +758,32 @@ def main():
         print("Cannot open board " + args.board)
         sys.exit(1)
 
+    if args.remove_hidden:
+        no_out_layers = []
+        no_out_layers.append(board.GetLayerID('Dwgs.User'))
+        no_out_layers.append(board.GetLayerID('Cmts.User'))
+        no_out_layers.append(board.GetLayerID('Eco1.User'))
+        no_out_layers.append(board.GetLayerID('Eco2.User'))
+        no_out_layers.append(board.GetLayerID('F.Fab'))
+        no_out_layers.append(board.GetLayerID('B.Fab'))
+        filtered = []
+        for d in board.DrawingsList():
+            l_d = d.GetLayer()
+            if l_d in no_out_layers:
+                filtered.append(d)
+        for f in filtered:
+            board.Remove(f)
+
+    global adjust_to_edge
+    adjust_to_edge = args.adjust_to_edge
+
     if args.list_components:
         walk_components(board, args.back,lambda lib, name, val, ref, pos:
                         print_component(args.libs, lib, name, val, ref, pos,
                                         remapping=remapping))
         sys.exit(0)
 
-    bb = board.ComputeBoundingBox()
+    bb = get_board_size(board)
     transform_string = ""
     if(args.back ^ args.mirror):
         transform_string = "translate({}, {}) scale(-1,1)".format(ki2dmil(bb.GetX()+bb.GetWidth()), ki2dmil(-bb.GetY()))
