@@ -45,7 +45,7 @@ float_re = r'([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)'
 
 class SvgPathItem:
     def __init__(self, path):
-        path = re.sub(r"([MLA])(\d+)", r"\1 \2", path)
+        path = re.sub(r"([MLA])(-?\d+)", r"\1 \2", path)
         path = re.split("[, ]", path)
         path = list(filter(lambda x: x, path))
         if path[0] != "M":
