@@ -526,7 +526,11 @@ def get_model_file(paths, lib, name, ref, remapping):
     """ Find model file in library considering component remapping """
     for path in paths:
         if ref in remapping:
-            lib, name = tuple(remapping[ref].split(":"))
+            lib, new_name = tuple(remapping[ref].split(":"))
+            if name.endswith(".back"):
+                name = new_name + ".back"
+            else:
+                name = new_name
         f = os.path.join(path, lib, name + ".svg")
         if os.path.isfile(f):
             return f
