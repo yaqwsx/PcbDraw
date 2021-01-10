@@ -10,6 +10,7 @@ import sys
 import tempfile
 import sysconfig
 import numpy as np
+from itertools import islice
 
 from wand.api import library
 from wand.color import Color
@@ -689,6 +690,47 @@ def setup_data_path():
     if len(data_path) == entries:
         data_path.append(os.path.join(sysconfig.get_path('data'), share))
 
+def merge_bbox(left, right):
+    """
+    Merge bounding boxes in format (xmin, xmax, ymin, ymax)
+    """
+    return tuple([
+        f(l, r) for l, r, f in zip(left, right, [min, max, min, max])
+    ])
+
+def shrink_svg(svgfilepath, shrinkBorder):
+    """
+    Shrink the SVG canvas to the size of the drawing
+    """
+    from svgpathtools import Document
+    document = Document(svgfilepath)
+    paths = document.paths()
+    if len(paths) == 0:
+        return
+    bbox = paths[0].bbox()
+    for x in paths:
+        bbox = merge_bbox(bbox, x.bbox())
+    bbox = list(bbox)
+    bbox[0] -= 3.78 * shrinkBorder
+    bbox[1] += 3.78 * shrinkBorder
+    bbox[2] -= 3.78 * shrinkBorder
+    bbox[3] += 3.78 * shrinkBorder
+    print(bbox)
+    svg = document.tree
+    root = svg.getroot()
+    root.attrib["viewBox"] = "{} {} {} {}".format(
+        bbox[0], bbox[2],
+        bbox[1] - bbox[0], bbox[3] - bbox[2]
+    )
+    root.attrib["width"] = str(ki2dmil(bbox[1] - bbox[0])) + "cm"
+    root.attrib["height"] = str(ki2dmil(bbox[3] - bbox[2])) + "cm"
+    document.save(svgfilepath)
+
+def postprocess_svg(svgfilepath, shrinkBorder):
+    if shrinkBorder is not None:
+        shrink_svg(svgfilepath, shrinkBorder)
+    # TBA: Add compression and optimization
+
 def main():
     setup_data_path()
     epilog = "Searching for styles on: "
@@ -721,6 +763,7 @@ def main():
     parser.add_argument("--silent", action="store_true", help="Silent warning messages about missing footprints")
     parser.add_argument("--dpi", help="DPI for bitmap output", type=int, default=300)
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
+    parser.add_argument("--shrink", type=float, help="Shrink the canvas size to the size of the board. Specify border in millimeters")
 
     args = parser.parse_args()
     libs = []
@@ -808,10 +851,12 @@ def main():
 
     if args.output.endswith(".svg") or args.output.endswith(".SVG"):
         document.write(args.output)
+        postprocess_svg(args.output, args.shrink)
     else:
         with tempfile.NamedTemporaryFile(suffix=".svg") as tmp_f:
             document.write(tmp_f)
             tmp_f.flush()
+            postprocess_svg(tmp_f.name, args.shrink)
             svg_to_bitmap(tmp_f.name, args.output, dpi=args.dpi)
 
 if __name__ == '__main__':

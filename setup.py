@@ -28,7 +28,8 @@ setuptools.setup(
         "mistune",
         "pybars3",
         "wand",
-        "pyyaml"
+        "pyyaml",
+        "svgpathtools"
     ],
     setup_requires=[
         "versioneer"
