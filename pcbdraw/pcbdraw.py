@@ -451,10 +451,8 @@ def get_board_substrate(board, colors, holes, back):
     return container
 
 def walk_components(board, back, export):
-    module = board.GetModules()
-    while True:
-        if not module:
-            return
+    module = board.GetModules().GetFirst()
+    while module:
         # Top is for Eagle boards imported to KiCAD
         if (str(module.GetLayerName()) in ["Back", "B.Cu"] and not  back) or \
            (str(module.GetLayerName()) in ["Top", "F.Cu"]  and      back):
@@ -486,7 +484,7 @@ def get_hole_mask(board):
     bg.attrib["width"] = str(ki2dmil(bb.GetWidth()))
     bg.attrib["height"] = str(ki2dmil(bb.GetHeight()))
 
-    module = board.GetModules()
+    module = board.GetModules().GetFirst()
     while module:
         if module.GetPadCount() == 0:
             module = module.Next()
