@@ -281,36 +281,36 @@ def get_board_polygon(svg_elements):
                 s = " M {0} {1} m-{2} 0 a {2} {2} 0 1 0 {3} 0 a {2} {2} 0 1 0 -{3} 0 ".format(
                     att["cx"], att["cy"], att["r"], 2 * float(att["r"]))
                 path += s
-    outline = [elements[0]]
-    elements = elements[1:]
-    while True:
-        size = len(outline)
-        for i, e in enumerate(elements):
-            if SvgPathItem.is_same(outline[0].start, e.end):
-                outline.insert(0, e)
-            elif SvgPathItem.is_same(outline[0].start, e.start):
-                e.flip()
-                outline.insert(0, e)
-            elif SvgPathItem.is_same(outline[-1].end, e.start):
-                outline.append(e)
-            elif SvgPathItem.is_same(outline[-1].end, e.end):
-                e.flip()
-                outline.append(e)
-            else:
-                continue
-            del elements[i]
-            break
-        if size == len(outline):
-            first = True
-            for x in outline:
-                path += x.format(first)
-                first = False
-            if elements:
-                outline = [elements[0]]
-                elements = elements[1:]
-            else:
-                e = etree.Element("path", d=path, style="fill-rule: evenodd;")
-                return e
+    while len(elements) > 0:
+        # Initiate seed for the outline
+        outline = [elements[0]]
+        elements = elements[1:]
+        size = 0
+        # Append new segments to the ends of outline until there is none to append.
+        while size != len(outline):
+            size = len(outline)
+            for i, e in enumerate(elements):
+                if SvgPathItem.is_same(outline[0].start, e.end):
+                    outline.insert(0, e)
+                elif SvgPathItem.is_same(outline[0].start, e.start):
+                    e.flip()
+                    outline.insert(0, e)
+                elif SvgPathItem.is_same(outline[-1].end, e.start):
+                    outline.append(e)
+                elif SvgPathItem.is_same(outline[-1].end, e.end):
+                    e.flip()
+                    outline.append(e)
+                else:
+                    continue
+                del elements[i]
+                break
+        # ...then, append it to path.
+        first = True
+        for x in outline:
+            path += x.format(first)
+            first = False
+    e = etree.Element("path", d=path, style="fill-rule: evenodd;")
+    return e
 
 def process_board_substrate_layer(container, name, source, colors, boardsize):
     layer = etree.SubElement(container, "g", id="substrate-" + name,
