@@ -66,7 +66,7 @@ There are several options for the script:
 
 ## Path to styles and libraries
 
-The styles and libraries can be installed in various locations. PcbDraw will
+The styles can be installed in various locations. PcbDraw will
 look for them in the following places:
 
 - 1st: the same directory where the script is installed. As an example take
@@ -74,11 +74,17 @@ look for them in the following places:
 - 2nd: the user local data directory. The script adds `share/pcbdraw`. As an
   example, on Linux systems the path for styles will be:
   `~/.local/share/pcbdraw/styles`
-- 3rd: the system data dyrectory. The script adds `share/pcbdraw`. As an
+- 3rd: the system data directory. The script adds `share/pcbdraw`. As an
   example, on Linux systems the path for styles will be:
   `/usr/share/pcbdraw/styles`
 
 The exact paths used on your system are displayed by the `--help` option.
+
+Similarly, the libraries will be searched for in these locations:
+
+- Same directory where the script is installed
+- User local data directory, on Linux this would be `~/.local/share/pcbdraw/footprints`
+- System data directory, on Linux this would be `/usr/share/pcbdraw/footprints`
 
 ## Writing Custom Styles
 
