@@ -5,12 +5,12 @@ import json
 import math
 import os
 import re
-import shutil
 import sys
 import tempfile
 import sysconfig
 import numpy as np
-from svgpathtools import Document
+import svgpathtools
+from itertools import islice
 
 from wand.api import library
 from wand.color import Color
@@ -197,6 +197,9 @@ def element_position(element, root=None):
 
 def ki2dmil(val):
     return val // 2540
+
+def dmil2ki(val):
+    return val * 2540
 
 def ki2mm(val):
     return val / 1000000.0
@@ -718,6 +721,45 @@ def setup_data_path():
     if len(data_path) == entries:
         data_path.append(os.path.join(sysconfig.get_path('data'), share))
 
+def merge_bbox(left, right):
+    """
+    Merge bounding boxes in format (xmin, xmax, ymin, ymax)
+    """
+    return tuple([
+        f(l, r) for l, r, f in zip(left, right, [min, max, min, max])
+    ])
+
+def shrink_svg(svgfilepath, shrinkBorder):
+    """
+    Shrink the SVG canvas to the size of the drawing
+    """
+    document = svgpathtools.Document(svgfilepath)
+    paths = document.paths()
+    if len(paths) == 0:
+        return
+    bbox = paths[0].bbox()
+    for x in paths:
+        bbox = merge_bbox(bbox, x.bbox())
+    bbox = list(bbox)
+    bbox[0] -= ki2dmil(mm2ki(shrinkBorder))
+    bbox[1] += ki2dmil(mm2ki(shrinkBorder))
+    bbox[2] -= ki2dmil(mm2ki(shrinkBorder))
+    bbox[3] += ki2dmil(mm2ki(shrinkBorder))
+    svg = document.tree
+    root = svg.getroot()
+    root.attrib["viewBox"] = "{} {} {} {}".format(
+        bbox[0], bbox[2],
+        bbox[1] - bbox[0], bbox[3] - bbox[2]
+    )
+    root.attrib["width"] = str(ki2mm(dmil2ki(bbox[1] - bbox[0]))) + "mm"
+    root.attrib["height"] = str(ki2mm(dmil2ki(bbox[3] - bbox[2]))) + "mm"
+    document.save(svgfilepath)
+
+def postprocess_svg(svgfilepath, shrinkBorder):
+    if shrinkBorder is not None:
+        shrink_svg(svgfilepath, shrinkBorder)
+    # TBA: Add compression and optimization
+
 def main():
     setup_data_path()
     epilog = "Searching for styles on: "
@@ -750,6 +792,7 @@ def main():
     parser.add_argument("--silent", action="store_true", help="Silent warning messages about missing footprints")
     parser.add_argument("--dpi", help="DPI for bitmap output", type=int, default=300)
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
+    parser.add_argument("--shrink", type=float, help="Shrink the canvas size to the size of the board. Specify border in millimeters")
 
     args = parser.parse_args()
     libs = []
@@ -843,9 +886,12 @@ def main():
 
     if args.output.endswith(".svg") or args.output.endswith(".SVG"):
         document.write(args.output)
+        postprocess_svg(args.output, args.shrink)
     else:
         with tempfile.NamedTemporaryFile(suffix=".svg") as tmp_f:
             document.write(tmp_f)
+            tmp_f.flush()
+            postprocess_svg(args.output, args.shrink)
             tmp_f.flush()
             svg_to_bitmap(tmp_f.name, args.output, dpi=args.dpi)
 

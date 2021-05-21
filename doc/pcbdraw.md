@@ -63,6 +63,8 @@ There are several options for the script:
 - `--mirror` render the board mirrored on the x axis
 - `--highlight` take a comma separated list of components and highlight them
 - `--filter` take a comma separated list of components and show only them
+- `--shrink` take a border in millimeter and shrink the canvas to the actual
+  board + component size
 
 ## Path to styles and libraries
 
