@@ -66,6 +66,13 @@ There are several options for the script:
 - `--shrink` take a border in millimeter and shrink the canvas to the actual
   board + component size
 
+## Breaking change in PcbDraw > v0.6
+
+Note that PcbDraw v0.6 is the last version that uses the convention 1 user unit
+= 1 millimeter. The newer version use proper SVG units. This, however, brings a
+breaking change to the library. Please migrate your libraries. For more details
+refer to [PcbDraw default library](https://github.com/yaqwsx/PcbDraw-Lib).
+
 ## Path to styles and libraries
 
 The styles can be installed in various locations. PcbDraw will
