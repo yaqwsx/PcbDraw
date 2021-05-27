@@ -613,8 +613,6 @@ def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, 
         w = ki2dmil(to_kicad_basic_units(svg_tree.attrib["width"]))
         h = ki2dmil(to_kicad_basic_units(svg_tree.attrib["height"]))
         build_highlight(highlight, w, h, pos, (origin_x, origin_y), (svg_scale_x, svg_scale_y), ref)
-    else:
-        print("Warning: component '{}' from library '{}' has no viewBox. Cannot highlight".format(name, lib))
 
 def build_highlight(preset, width, height, pos, origin, scale, ref):
     h = etree.SubElement(preset["container"], "rect")
