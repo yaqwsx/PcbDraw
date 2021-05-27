@@ -29,7 +29,8 @@ setuptools.setup(
         "pybars3",
         "wand",
         "pyyaml",
-        "click"
+        "click",
+        "svgpathtools"
     ],
     setup_requires=[
         "versioneer"
