@@ -27,6 +27,16 @@ There are two separate guides:
 
 There are also examples of usage in the `examples` directory.
 
+## Running with KiCAD nightly (v5.99)
+
+If you would like to use PcbDraw with KiCAD nightly, you can! Just point
+environmental variable PYTHON_PATH to the correct path to the nighly module.
+E.g., on Ubuntu:
+
+```
+PYTHONPATH=/usr/lib/kicad-nightly/lib/python3/dist-packages pcbdraw --help
+```
+
 ## Contributing
 
 Feel free to submit issues and pull requests!

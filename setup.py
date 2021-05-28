@@ -30,7 +30,8 @@ setuptools.setup(
         "wand",
         "pyyaml",
         "click",
-        "svgpathtools"
+        "svgpathtools",
+        "pcbnewTransition"
     ],
     setup_requires=[
         "versioneer"

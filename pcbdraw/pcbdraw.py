@@ -11,12 +11,13 @@ import sysconfig
 import numpy as np
 import svgpathtools
 from itertools import islice
+import time
 
 from wand.api import library
 from wand.color import Color
 from wand.image import Image
 
-import pcbnew
+from pcbnewTransition import pcbnew, pcbnewVersion, isV6
 from lxml import etree
 
 # Give more priority to local modules than installed versions
@@ -207,6 +208,10 @@ def ki2mm(val):
 def mm2ki(val):
     return val * 1000000
 
+# KiCAD 5 and KiCAD 6 use different units of the SVG
+ki2svg = (lambda x: x) if isV6(pcbnewVersion) else ki2dmil
+svg2ki = (lambda x: x) if isV6(pcbnewVersion) else dmil2ki
+
 def to_kicad_basic_units(val):
     """
     Read string value and return it as KiCAD base units
@@ -378,16 +383,16 @@ def process_board_substrate_mask(container, name, source, colors, boardsize):
         mask.append(element)
     silkMask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
     silkMask.attrib["id"] = name + "-silkscreen"
+    bg = etree.SubElement(silkMask, "rect", attrib={
+        "x": str(ki2svg(boardsize.GetX())),
+        "y": str(ki2svg(boardsize.GetY())),
+        "width": str(ki2svg(boardsize.GetWidth())),
+        "height": str(ki2svg(boardsize.GetHeight())),
+        "fill": "white"
+    })
     for element in extract_svg_content(read_svg_unique(source)):
         # KiCAD plots black, no need to change fill
         silkMask.append(element)
-    bg = etree.SubElement(silkMask, "rect", attrib={
-        "x": str(ki2dmil(boardsize.GetX())),
-        "y": str(ki2dmil(boardsize.GetY())),
-        "width": str(ki2dmil(boardsize.GetWidth())),
-        "height": str(ki2dmil(boardsize.GetHeight())),
-        "fill": "white"
-    })
 
 def get_layers(board, colors, toPlot):
     """
@@ -406,7 +411,7 @@ def get_layers(board, colors, toPlot):
         except:
             # Method does not exist in older versions of KiCad
             pass
-        popt.SetTextMode(pcbnew.PLOTTEXTMODE_STROKE)
+        popt.SetTextMode(pcbnew.PLOT_TEXT_MODE_STROKE)
         for f, layers, _ in toPlot:
             pctl.OpenPlotfile(f, pcbnew.PLOT_FORMAT_SVG, f)
             for l in layers:
@@ -460,7 +465,7 @@ def get_board_substrate(board, colors, holes, back):
         except:
             # Method does not exist in older versions of KiCad
             pass
-        popt.SetTextMode(pcbnew.PLOTTEXTMODE_STROKE)
+        popt.SetTextMode(pcbnew.PLOT_TEXT_MODE_STROKE)
         for f, layers, _ in toPlot:
             pctl.OpenPlotfile(f, pcbnew.PLOT_FORMAT_SVG, f)
             for l in layers:
@@ -480,12 +485,10 @@ def get_board_substrate(board, colors, holes, back):
     return container
 
 def walk_components(board, back, export):
-    module = board.GetModules().GetFirst()
-    while module:
+    for module in board.GetFootprints():
         # Top is for Eagle boards imported to KiCAD
         if (str(module.GetLayerName()) in ["Back", "B.Cu"] and not  back) or \
            (str(module.GetLayerName()) in ["Top", "F.Cu"]  and      back):
-            module = module.Next()
             continue
         lib = str(module.GetFPID().GetLibNickname()).strip()
         try:
@@ -495,11 +498,10 @@ def walk_components(board, back, export):
             name = str(module.GetFPID().GetLibItemName()).strip()
         value = module.GetValue().strip()
         ref = module.GetReference().strip()
-        center = module.GetCenter()
+        center = module.GetPosition()
         orient = math.radians(module.GetOrientation() / 10)
         pos = (center.x, center.y, orient)
         export(lib, name, value, ref, pos)
-        module = module.Next()
 
 def get_hole_mask(board):
     defs = etree.Element("defs")
@@ -508,27 +510,20 @@ def get_hole_mask(board):
 
     bb = board.ComputeBoundingBox()
     bg = etree.SubElement(container, "rect", x="0", y="0", fill="white")
-    bg.attrib["x"] = str(ki2dmil(bb.GetX()))
-    bg.attrib["y"] = str(ki2dmil(bb.GetY()))
-    bg.attrib["width"] = str(ki2dmil(bb.GetWidth()))
-    bg.attrib["height"] = str(ki2dmil(bb.GetHeight()))
+    bg.attrib["x"] = str(ki2svg(bb.GetX()))
+    bg.attrib["y"] = str(ki2svg(bb.GetY()))
+    bg.attrib["width"] = str(ki2svg(bb.GetWidth()))
+    bg.attrib["height"] = str(ki2svg(bb.GetHeight()))
 
-    module = board.GetModules().GetFirst()
-    while module:
+    for module in board.GetFootprints():
         if module.GetPadCount() == 0:
-            module = module.Next()
             continue
-        try:
-            pad = module.PadsList()
-        except AttributeError:
-            # Older interfase used Pads()
-            pad = module.Pads()
-        while pad:
+        for pad in module.Pads():
             pos = pad.GetPosition()
             padOrientation = pad.GetOrientation()
-            pos.x = ki2dmil(pos.x)
-            pos.y = ki2dmil(pos.y)
-            size = list(map(ki2dmil, pad.GetDrillSize()))
+            pos.x = ki2svg(pos.x)
+            pos.y = ki2svg(pos.y)
+            size = list(map(ki2svg, pad.GetDrillSize()))
             if size[0] > 0 and size[1] > 0:
                 if size[0] < size[1]:
                     stroke = size[0]
@@ -545,8 +540,6 @@ def get_hole_mask(board):
                 el.attrib["points"] = points
                 el.attrib["transform"] = "translate({} {}) rotate({})".format(
                     pos.x, pos.y, -padOrientation / 10)
-            pad = pad.Next()
-        module = module.Next()
     return defs
 
 def get_model_file(paths, lib, name, ref, remapping):
@@ -569,9 +562,9 @@ def print_component(paths, lib, name, value, ref, pos, remapping={}):
         ref, lib, name, pos[0], pos[1], math.degrees(pos[2]), f if f else "Not found")
     print(msg)
 
-def get_svg2dmil_scale(svg):
-    width = ki2dmil(to_kicad_basic_units(svg.attrib["width"]))
-    height = ki2dmil(to_kicad_basic_units(svg.attrib["height"]))
+def component_to_board_scale(svg):
+    width = ki2svg(to_kicad_basic_units(svg.attrib["width"]))
+    height = ki2svg(to_kicad_basic_units(svg.attrib["height"]))
     x, y, vw, vh = [float(x) for x in svg.attrib["viewBox"].split()]
     return width / vw, height / vh
 
@@ -586,8 +579,8 @@ def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, 
             if name[-5:] != '.back' or not no_warn_back:
                 print("Warning: component '{}' for footprint '{}' from library '{}' was not found".format(name, ref, lib))
         if comp["placeholder"]:
-            etree.SubElement(comp["container"], "rect", x=str(ki2dmil(pos[0]) - 150), y=str(ki2dmil(pos[1]) - 150),
-                             width="300", height="300", style="fill:red;")
+            etree.SubElement(comp["container"], "rect", x=str(ki2svg(pos[0] - mm2ki(0.5))), y=str(ki2svg(pos[1] - mm2ki(0.5))),
+                             width=str(ki2svg(mm2ki(1))), height=str(ki2svg(mm2ki(1))), style="fill:red;")
         return
     comp["container"].append(etree.Comment("{}:{}".format(lib, name)))
     r = etree.SubElement(comp["container"], "g")
@@ -603,15 +596,15 @@ def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, 
     else:
         print("Warning: component '{}' from library '{}' has no ORIGIN".format(name, lib))
 
-    svg_scale_x, svg_scale_y = get_svg2dmil_scale(svg_tree)
+    svg_scale_x, svg_scale_y = component_to_board_scale(svg_tree)
     r.attrib["transform"] = \
-        f"translate({ki2dmil(pos[0])} {ki2dmil(pos[1])}) " + \
+        f"translate({ki2svg(pos[0])} {ki2svg(pos[1])}) " + \
         f"scale({svg_scale_x} {svg_scale_y}) " + \
         f"rotate({-math.degrees(pos[2])}) " + \
         f"translate({-origin_x}, {-origin_y})"
     if ref in highlight["items"]:
-        w = ki2dmil(to_kicad_basic_units(svg_tree.attrib["width"]))
-        h = ki2dmil(to_kicad_basic_units(svg_tree.attrib["height"]))
+        w = ki2svg(to_kicad_basic_units(svg_tree.attrib["width"]))
+        h = ki2svg(to_kicad_basic_units(svg_tree.attrib["height"]))
         build_highlight(highlight, w, h, pos, (origin_x, origin_y), (svg_scale_x, svg_scale_y), ref)
 
 def build_highlight(preset, width, height, pos, origin, scale, ref):
@@ -622,7 +615,7 @@ def build_highlight(preset, width, height, pos, origin, scale, ref):
     h.attrib["width"] = str(width / scale[0] + 2 * preset["padding"])
     h.attrib["height"] = str(height / scale[1] + 2 * preset["padding"])
     h.attrib["transform"] = \
-        f"translate({ki2dmil(pos[0])} {ki2dmil(pos[1])}) " + \
+        f"translate({ki2svg(pos[0])} {ki2svg(pos[1])}) " + \
         f"scale({scale[0]} {scale[1]}) " + \
         f"rotate({-math.degrees(pos[2])}) " + \
         f"translate({-origin[0]}, {-origin[1]})"
@@ -739,18 +732,18 @@ def shrink_svg(svgfilepath, shrinkBorder):
     for x in paths:
         bbox = merge_bbox(bbox, x.bbox())
     bbox = list(bbox)
-    bbox[0] -= ki2dmil(mm2ki(shrinkBorder))
-    bbox[1] += ki2dmil(mm2ki(shrinkBorder))
-    bbox[2] -= ki2dmil(mm2ki(shrinkBorder))
-    bbox[3] += ki2dmil(mm2ki(shrinkBorder))
+    bbox[0] -= ki2svg(mm2ki(shrinkBorder))
+    bbox[1] += ki2svg(mm2ki(shrinkBorder))
+    bbox[2] -= ki2svg(mm2ki(shrinkBorder))
+    bbox[3] += ki2svg(mm2ki(shrinkBorder))
     svg = document.tree
     root = svg.getroot()
     root.attrib["viewBox"] = "{} {} {} {}".format(
         bbox[0], bbox[2],
         bbox[1] - bbox[0], bbox[3] - bbox[2]
     )
-    root.attrib["width"] = str(ki2mm(dmil2ki(bbox[1] - bbox[0]))) + "mm"
-    root.attrib["height"] = str(ki2mm(dmil2ki(bbox[3] - bbox[2]))) + "mm"
+    root.attrib["width"] = str(ki2mm(svg2ki(bbox[1] - bbox[0]))) + "mm"
+    root.attrib["height"] = str(ki2mm(svg2ki(bbox[3] - bbox[2]))) + "mm"
     document.save(svgfilepath)
 
 def postprocess_svg(svgfilepath, shrinkBorder):
@@ -829,19 +822,20 @@ def main():
     bb = board.ComputeBoundingBox()
     transform_string = ""
     # Let me briefly explain what's going on. KiCAD outputs SVG in user units,
-    # where 1 unit is 1/10 of an inch (don't ask me why). So to make our life
-    # easy, we respect it and make our document also in decimils. Therefore we
-    # specify the outer dimensions in millimeters and specify the board area.
+    # where 1 unit is 1/10 of an inch (in v5) or KiCAD native unit (v6). So to
+    # make our life easy, we respect it and make our document also in the
+    # corresponding units. Therefore we specify the outer dimensions in
+    # millimeters and specify the board area.
     document = empty_svg(
             width=f"{ki2mm(bb.GetWidth())}mm",
             height=f"{ki2mm(bb.GetHeight())}mm",
-            viewBox=f"{ki2dmil(bb.GetX())} {ki2dmil(bb.GetY())} {ki2dmil(bb.GetWidth())} {ki2dmil(bb.GetHeight())}")
+            viewBox=f"{ki2svg(bb.GetX())} {ki2svg(bb.GetY())} {ki2svg(bb.GetWidth())} {ki2svg(bb.GetHeight())}")
     if(args.back ^ args.mirror):
         transform_string = "scale(-1,1)"
         document = empty_svg(
             width=f"{ki2mm(bb.GetWidth())}mm",
             height=f"{ki2mm(bb.GetHeight())}mm",
-            viewBox=f"{ki2dmil(-bb.GetWidth() - bb.GetX())} {ki2dmil(bb.GetY())} {ki2dmil(bb.GetWidth())} {ki2dmil(bb.GetHeight())}")
+            viewBox=f"{ki2svg(-bb.GetWidth() - bb.GetX())} {ki2svg(bb.GetY())} {ki2svg(bb.GetWidth())} {ki2svg(bb.GetHeight())}")
 
     board_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
     if style["highlight-on-top"]:
