@@ -347,7 +347,7 @@ def get_board_polygon(svg_elements):
     e = etree.Element("path", d=path, style="fill-rule: evenodd;")
     return e
 
-def process_board_substrate_layer(container, name, source, colors, boardsize):
+def process_board_substrate_layer(container, defs, name, source, colors, boardsize):
     layer = etree.SubElement(container, "g", id="substrate-" + name,
         style="fill:{0}; stroke:{0};".format(colors[name]))
     if name == "pads":
@@ -358,8 +358,8 @@ def process_board_substrate_layer(container, name, source, colors, boardsize):
         strip_fill_svg(element)
         layer.append(element)
 
-def process_board_substrate_base(container, name, source, colors, boardsize):
-    clipPath = etree.SubElement(etree.SubElement(container, "defs"), "clipPath")
+def process_board_substrate_base(container, defs, name, source, colors, boardsize):
+    clipPath = etree.SubElement(defs, "clipPath")
     clipPath.attrib["id"] = "cut-off"
     clipPath.append(get_board_polygon(extract_svg_content(read_svg_unique(source))))
 
@@ -372,8 +372,8 @@ def process_board_substrate_base(container, name, source, colors, boardsize):
         strip_fill_svg(element)
         outline.append(element)
 
-def process_board_substrate_mask(container, name, source, colors, boardsize):
-    mask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
+def process_board_substrate_mask(container, defs, name, source, colors, boardsize):
+    mask = etree.SubElement(defs, "mask")
     mask.attrib["id"] = name
     for element in extract_svg_content(read_svg_unique(source)):
         for item in element.getiterator():
@@ -381,7 +381,7 @@ def process_board_substrate_mask(container, name, source, colors, boardsize):
                 # KiCAD plots in black, for mask we need white
                 item.attrib["style"] = item.attrib["style"].replace("#000000", "#ffffff")
         mask.append(element)
-    silkMask = etree.SubElement(etree.SubElement(container, "defs"), "mask")
+    silkMask = etree.SubElement(defs, "mask")
     silkMask.attrib["id"] = name + "-silkscreen"
     bg = etree.SubElement(silkMask, "rect", attrib={
         "x": str(ki2svg(boardsize.GetX())),
@@ -394,7 +394,7 @@ def process_board_substrate_mask(container, name, source, colors, boardsize):
         # KiCAD plots black, no need to change fill
         silkMask.append(element)
 
-def get_layers(board, colors, toPlot):
+def get_layers(board, colors, defs, toPlot):
     """
     Plot given layers, process them and return them as <g>
     """
@@ -423,10 +423,10 @@ def get_layers(board, colors, toPlot):
         for f, _, process in toPlot:
             for svg_file in os.listdir(tmp):
                 if svg_file.endswith("-" + f + ".svg"):
-                    process(container, f, os.path.join(tmp, svg_file), colors, boardsize)
+                    process(container, defs, f, os.path.join(tmp, svg_file), colors, boardsize)
     return container
 
-def get_board_substrate(board, colors, holes, back):
+def get_board_substrate(board, colors, defs, holes, back):
     """
     Plots all front layers from the board and arranges them in a visually appealing style.
     return SVG g element with the board substrate
@@ -477,10 +477,10 @@ def get_board_substrate(board, colors, holes, back):
         for f, _, process in toPlot:
             for svg_file in os.listdir(tmp):
                 if svg_file.endswith("-" + f + ".svg"):
-                    process(container, f, os.path.join(tmp, svg_file), colors, boardsize)
+                    process(container, defs, f, os.path.join(tmp, svg_file), colors, boardsize)
 
     if holes:
-        container.append(get_hole_mask(board))
+        get_hole_mask(board, defs)
         container.attrib["mask"] = "url(#hole-mask)"
     return container
 
@@ -503,8 +503,7 @@ def walk_components(board, back, export):
         pos = (center.x, center.y, orient)
         export(lib, name, value, ref, pos)
 
-def get_hole_mask(board):
-    defs = etree.Element("defs")
+def get_hole_mask(board, defs):
     mask = etree.SubElement(defs, "mask", id="hole-mask")
     container = etree.SubElement(mask, "g")
 
@@ -540,7 +539,6 @@ def get_hole_mask(board):
                 el.attrib["points"] = points
                 el.attrib["transform"] = "translate({} {}) rotate({})".format(
                     pos.x, pos.y, -padOrientation / 10)
-    return defs
 
 def get_model_file(paths, lib, name, ref, remapping):
     """ Find model file in library considering component remapping """
@@ -837,6 +835,7 @@ def main():
             height=f"{ki2mm(bb.GetHeight())}mm",
             viewBox=f"{ki2svg(-bb.GetWidth() - bb.GetX())} {ki2svg(bb.GetY())} {ki2svg(bb.GetWidth())} {ki2svg(bb.GetHeight())}")
 
+    defs = etree.SubElement(document.getroot(), "defs")
     board_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
     if style["highlight-on-top"]:
         comp_cont = etree.SubElement(document.getroot(), "g", transform=transform_string)
@@ -864,9 +863,9 @@ def main():
         "padding": style["highlight-padding"]
     }
 
-    board_cont.append(get_board_substrate(board, style, not args.no_drillholes, args.back))
+    board_cont.append(get_board_substrate(board, style, defs, not args.no_drillholes, args.back))
     if args.vcuts:
-        board_cont.append(get_layers(board, style, [("vcut", [pcbnew.Cmts_User], process_board_substrate_layer)]))
+        board_cont.append(get_layers(board, style, defs, [("vcut", [pcbnew.Cmts_User], process_board_substrate_layer)]))
 
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name, val, ref, pos, components, highlight, args.silent, args.no_warn_back))
