@@ -27,6 +27,11 @@ There are two separate guides:
 
 There are also examples of usage in the `examples` directory.
 
+## PcbDraw seems to be broken!
+
+Please, read [FAQ](doc/faq.md) first. If it does not answer your problem, feel
+free to open issue on GitHub.
+
 ## Running with KiCAD nightly (v5.99)
 
 If you would like to use PcbDraw with KiCAD nightly, you can! Just point
@@ -44,6 +49,3 @@ Feel free to submit issues and pull requests!
 ## Future Work
 
 - make reasonably complete module library
-- produce nicer SVG file structures (make SVG smaller by including each module
-  exactly once, treat ids correctly,...)
-- support value labels on modules
