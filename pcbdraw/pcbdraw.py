@@ -18,12 +18,15 @@ from wand.color import Color
 from wand.image import Image
 
 from pcbnewTransition import pcbnew, pcbnewVersion, isV6
-from lxml import etree
+from lxml import etree, objectify
+
 
 # Give more priority to local modules than installed versions
 PKG_BASE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.dirname(os.path.abspath(PKG_BASE)))
 from pcbdraw import __version__
+
+etree.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
 STYLES_SUBDIR = 'styles'
 FOOTPRINTS_SUBDIR = 'footprints'
@@ -248,6 +251,14 @@ def to_user_units(val):
         return 35.43307 * value
     if unit == "in":
         return 90
+
+def make_XML_identifier(s):
+    """
+    Given a name, strip invalid characters from XML identifier
+    """
+    s = re.sub('[^0-9a-zA-Z_]', '', s)
+    s = re.sub('^[^a-zA-Z_]+', '', s)
+    return s
 
 def read_svg_unique(filename):
     prefix = unique_prefix() + "_"
@@ -566,43 +577,72 @@ def component_to_board_scale(svg):
     x, y, vw, vh = [float(x) for x in svg.attrib["viewBox"].split()]
     return width / vw, height / vh
 
-def component_from_library(lib, name, value, ref, pos, comp, highlight, silent, no_warn_back):
+def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
+                           highlight, silent, no_warn_back):
     if not name:
         return
     if comp["filter"] is not None and ref not in comp["filter"]:
         return
-    f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
-    if not f:
-        if not silent:
-            if name[-5:] != '.back' or not no_warn_back:
-                print("Warning: component '{}' for footprint '{}' from library '{}' was not found".format(name, ref, lib))
-        if comp["placeholder"]:
-            etree.SubElement(comp["container"], "rect", x=str(ki2svg(pos[0] - mm2ki(0.5))), y=str(ki2svg(pos[1] - mm2ki(0.5))),
-                             width=str(ki2svg(mm2ki(1))), height=str(ki2svg(mm2ki(1))), style="fill:red;")
-        return
+
+    unique_name = f"{lib}__{name}"
+    if unique_name in usedComponents:
+        componentInfo = usedComponents[unique_name]
+        componentElement = etree.Element("use", attrib={"{http://www.w3.org/1999/xlink}href": "#" + componentInfo["id"]})
+    else:
+        f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
+        if not f:
+            if not silent:
+                if name[-5:] != '.back' or not no_warn_back:
+                    print("Warning: component '{}' for footprint '{}' from library '{}' was not found".format(name, ref, lib))
+            if comp["placeholder"]:
+                etree.SubElement(comp["container"], "rect", x=str(ki2svg(pos[0] - mm2ki(0.5))), y=str(ki2svg(pos[1] - mm2ki(0.5))),
+                                width=str(ki2svg(mm2ki(1))), height=str(ki2svg(mm2ki(1))), style="fill:red;")
+            return
+        xml_id = make_XML_identifier(unique_name)
+        componentElement = etree.Element("g", attrib={"id": xml_id})
+        svg_tree = read_svg_unique(f)
+        for x in extract_svg_content(svg_tree):
+            if x.tag in ["namedview", "metadata"]:
+                continue
+            componentElement.append(x)
+        origin_x = 0
+        origin_y = 0
+        origin = componentElement.find(".//*[@id='origin']")
+        if origin is not None:
+            origin_x, origin_y = element_position(origin, root=componentElement)
+            origin.getparent().remove(origin)
+        else:
+            print("Warning: component '{}' from library '{}' has no ORIGIN".format(name, lib))
+        svg_scale_x, svg_scale_y = component_to_board_scale(svg_tree)
+        componentInfo = {
+            "id": xml_id,
+            "origin_x": origin_x,
+            "origin_y": origin_y,
+            "scale_x": svg_scale_x,
+            "scale_y": svg_scale_y,
+            "width": svg_tree.attrib["width"],
+            "height": svg_tree.attrib["height"]
+        }
+        usedComponents[unique_name] = componentInfo
+
     comp["container"].append(etree.Comment("{}:{}".format(lib, name)))
     r = etree.SubElement(comp["container"], "g")
-    svg_tree = read_svg_unique(f)
-    for x in extract_svg_content(svg_tree):
-        r.append(x)
-    origin_x = 0
-    origin_y = 0
-    origin = r.find(".//*[@id='origin']")
-    if origin is not None:
-        origin_x, origin_y = element_position(origin, root=r)
-        origin.getparent().remove(origin)
-    else:
-        print("Warning: component '{}' from library '{}' has no ORIGIN".format(name, lib))
+    r.append(componentElement)
+    svg_scale_x = componentInfo["scale_x"]
+    svg_scale_y = componentInfo["scale_y"]
+    origin_x = componentInfo["origin_x"]
+    origin_y = componentInfo["origin_y"]
+    width = componentInfo["width"]
+    height = componentInfo["height"]
 
-    svg_scale_x, svg_scale_y = component_to_board_scale(svg_tree)
     r.attrib["transform"] = \
         f"translate({ki2svg(pos[0])} {ki2svg(pos[1])}) " + \
         f"scale({svg_scale_x} {svg_scale_y}) " + \
         f"rotate({-math.degrees(pos[2])}) " + \
         f"translate({-origin_x}, {-origin_y})"
     if ref in highlight["items"]:
-        w = ki2svg(to_kicad_basic_units(svg_tree.attrib["width"]))
-        h = ki2svg(to_kicad_basic_units(svg_tree.attrib["height"]))
+        w = ki2svg(to_kicad_basic_units(width))
+        h = ki2svg(to_kicad_basic_units(height))
         build_highlight(highlight, w, h, pos, (origin_x, origin_y), (svg_scale_x, svg_scale_y), ref)
 
 def build_highlight(preset, width, height, pos, origin, scale, ref):
@@ -744,6 +784,29 @@ def shrink_svg(svgfilepath, shrinkBorder):
     root.attrib["height"] = str(ki2mm(svg2ki(bbox[3] - bbox[2]))) + "mm"
     document.save(svgfilepath)
 
+def remove_empty_elems(tree):
+    """
+    Given SVG tree, remove empty groups and defs
+    """
+    for elem in tree:
+        remove_empty_elems(elem)
+    toDel = []
+    for elem in tree:
+        if elem.tag in ["g", "defs"] and len(elem.getchildren()) == 0:
+            toDel.append(elem)
+    for elem in toDel:
+        tree.remove(elem)
+
+def remove_inkscape_annotation(tree):
+    for elem in tree:
+        remove_inkscape_annotation(elem)
+    for key in tree.attrib.keys():
+        if "inkscape" in key:
+            tree.attrib.pop(key)
+    # Comments have callable tag...
+    if not callable(tree.tag):
+        objectify.deannotate(tree, cleanup_namespaces=True)
+
 def postprocess_svg(svgfilepath, shrinkBorder):
     if shrinkBorder is not None:
         shrink_svg(svgfilepath, shrinkBorder)
@@ -867,13 +930,19 @@ def main():
     if args.vcuts:
         board_cont.append(get_layers(board, style, defs, [("vcut", [pcbnew.Cmts_User], process_board_substrate_layer)]))
 
+    usedComponents = {}
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
-        component_from_library(lib, name, val, ref, pos, components, highlight, args.silent, args.no_warn_back))
+        component_from_library(lib, name, val, ref, pos, usedComponents,
+                               components, highlight, args.silent, args.no_warn_back))
 
     # make another pass for search, and if found, render the back side of the component
     # the function will search for file with extension ".back.svg"
     walk_components(board, not args.back, lambda lib, name, val, ref, pos:
-        component_from_library(lib, name+".back", val, ref, pos, components, highlight, args.silent, args.no_warn_back))
+        component_from_library(lib, name+".back", val, ref, pos, usedComponents,
+                                components, highlight, args.silent, args.no_warn_back))
+
+    remove_empty_elems(document.getroot())
+    remove_inkscape_annotation(document.getroot())
 
     if args.output.endswith(".svg") or args.output.endswith(".SVG"):
         document.write(args.output)
