@@ -18,6 +18,11 @@ easily specify & maintain nice looking HTML or Markdown population manuals.
 
 ![example](promo_populate.jpg)
 
+## Installation
+
+PcbDraw is a stand-alone CLI tool distributed as a Python package. Read more
+details in the [installation guide](doc/installation.md).
+
 ## Usage
 
 There are two separate guides:
