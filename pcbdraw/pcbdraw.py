@@ -12,6 +12,8 @@ import numpy as np
 import svgpathtools
 from itertools import islice
 import time
+import engineering_notation
+from decimal import Decimal
 
 from wand.api import library
 from wand.color import Color
@@ -260,7 +262,7 @@ def make_XML_identifier(s):
     s = re.sub('^[^a-zA-Z_]+', '', s)
     return s
 
-def read_svg_unique(filename):
+def read_svg_unique(filename, return_prefix = False):
     prefix = unique_prefix() + "_"
     root = etree.parse(filename).getroot()
     # We have to ensure all Ids in SVG are unique. Let's make it nasty by
@@ -278,6 +280,8 @@ def read_svg_unique(filename):
     for el in root.getiterator():
         if "id" in el.attrib and el.attrib["id"] != "origin":
             el.attrib["id"] = prefix + el.attrib["id"]
+    if return_prefix:
+        return root, prefix
     return root
 
 def extract_svg_content(root):
@@ -613,12 +617,26 @@ def component_to_board_scale(svg):
 
 def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
                            highlight, silent, no_warn_back):
+    # TODO: Temporary, maybe put in a style json file
+    resistor_color_map = {
+      0: '#000000',
+      1: '#805500',
+      2: '#ff0000',
+      3: '#ffff00',
+      4: '#ff8000',
+      5: '#00cc11',
+      6: '#0000cc',
+      7: '#cc00cc',
+      8: '#666666',
+      9: '#cccccc',
+    }
+
     if not name:
         return
     if comp["filter"] is not None and ref not in comp["filter"]:
         return
 
-    unique_name = f"{lib}__{name}"
+    unique_name = f"{lib}__{name}_{value}"
     if unique_name in usedComponents:
         componentInfo = usedComponents[unique_name]
         componentElement = etree.Element("use", attrib={"{http://www.w3.org/1999/xlink}href": "#" + componentInfo["id"]})
@@ -634,7 +652,7 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
             return
         xml_id = make_XML_identifier(unique_name)
         componentElement = etree.Element("g", attrib={"id": xml_id})
-        svg_tree = read_svg_unique(f)
+        svg_tree, svg_prefix = read_svg_unique(f, True)
         for x in extract_svg_content(svg_tree):
             if x.tag in ["namedview", "metadata"]:
                 continue
@@ -658,6 +676,28 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
             "height": svg_tree.attrib["height"]
         }
         usedComponents[unique_name] = componentInfo
+
+        if lib == "Resistor_THT":
+            # TODO: Move this into it's own function
+            res = Decimal(float(engineering_notation.EngNumber(value)))
+            power = math.floor(res.log10())-1
+            res = str(int(res / 10**power))
+            resistor_colors = [
+                resistor_color_map[int(res[0])],
+                resistor_color_map[int(res[1])],
+                resistor_color_map[int(power)],
+                "#ffc800"
+            ]
+            for res_i, res_c in enumerate(resistor_colors):
+                band = componentElement.find(".//*[@id='{}res_band{}']".format(svg_prefix, res_i+1))
+                s = band.attrib["style"].split(";")
+                for i in range(len(s)):
+                    if s[i].startswith('fill:'):
+                        s_split = s[i].split(':')
+                        s_split[1] = res_c
+                        s[i] = ':'.join(s_split)
+                        break
+                band.attrib["style"] = ";".join(s)
 
     comp["container"].append(etree.Comment("{}:{}".format(lib, name)))
     r = etree.SubElement(comp["container"], "g")
