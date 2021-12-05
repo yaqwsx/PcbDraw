@@ -281,7 +281,7 @@ def read_svg_unique(filename):
     return root
 
 def extract_svg_content(root):
-    # Remove SVG namespace to ease our lifes and change ids
+    # Remove SVG namespace to ease our lives and change ids
     for el in root.getiterator():
         if '}' in str(el.tag):
             el.tag = el.tag.split('}', 1)[1]
@@ -828,7 +828,7 @@ def main():
     parser.add_argument("-s", "--style", help="JSON file with board style")
     parser.add_argument("board", help=".kicad_pcb file to draw")
     parser.add_argument("output", help="destination for final SVG or PNG file")
-    parser.add_argument("-l", "--libs", help="coma separated list of libraries; use default, kicad-default or eagle-default for built-in libraries", default="default")
+    parser.add_argument("-l", "--libs", help="comma separated list of libraries; use default, kicad-default or eagle-default for built-in libraries", default="default")
     parser.add_argument("-p", "--placeholder", action="store_true",
                         help="show placeholder for missing components")
     parser.add_argument("-m", "--remap",
