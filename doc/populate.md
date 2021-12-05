@@ -34,7 +34,7 @@ Additionally you can pass following arguments:
 - `--board <board>` KiCad board used for images
 - `--libs <libraries>` libraries for PcbDraw. Comma separated list of paths
 - `--type (md|html)` specify output format - HTML or markdown
-- `--img_name <teamplate>` name for generated images. It should contain one
+- `--img_name <template>` name for generated images. It should contain one
   python formatting section. E.g. `img/pupulate_img_{}.svg`. Possible formats
   are SVG and PNG.
 - `--template` handlebars file with a HTML web page template. Required only for
