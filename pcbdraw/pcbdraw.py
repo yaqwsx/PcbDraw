@@ -17,7 +17,7 @@ from wand.api import library
 from wand.color import Color
 from wand.image import Image
 
-from pcbnewTransition import pcbnew, pcbnewVersion, isV6
+from pcbnewTransition import pcbnew, KICAD_VERSION, isV6
 from lxml import etree, objectify
 
 
@@ -212,8 +212,8 @@ def mm2ki(val):
     return val * 1000000
 
 # KiCAD 5 and KiCAD 6 use different units of the SVG
-ki2svg = (lambda x: x) if isV6(pcbnewVersion) else ki2dmil
-svg2ki = (lambda x: x) if isV6(pcbnewVersion) else dmil2ki
+ki2svg = (lambda x: x) if isV6(KICAD_VERSION) else ki2dmil
+svg2ki = (lambda x: x) if isV6(KICAD_VERSION) else dmil2ki
 
 def to_kicad_basic_units(val):
     """
