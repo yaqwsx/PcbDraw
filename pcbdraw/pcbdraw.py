@@ -951,7 +951,7 @@ def main():
         with tempfile.NamedTemporaryFile(suffix=".svg") as tmp_f:
             document.write(tmp_f)
             tmp_f.flush()
-            postprocess_svg(args.output, args.shrink)
+            postprocess_svg(tmp_f.name, args.shrink)
             tmp_f.flush()
             svg_to_bitmap(tmp_f.name, args.output, dpi=args.dpi)
 
