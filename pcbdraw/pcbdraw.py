@@ -57,6 +57,14 @@ default_style = {
         7: '#cc00cc',
         8: '#666666',
         9: '#cccccc',
+        '1%': '#805500',
+        '2%': '#ff0000',
+        '0.5%': '#00cc11',
+        '0.25%': '#0000cc',
+        '0.1%': '#cc00cc',
+        '0.05%': '#666666',
+        '5%': '#ffc800',
+        '10%': '#d9d9d9',
     }
 }
 
@@ -628,7 +636,7 @@ def component_to_board_scale(svg):
     return width / vw, height / vh
 
 def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
-                           highlight, silent, no_warn_back, style, custom_res_color):
+                           highlight, silent, no_warn_back, style, tht_resistor_settings):
 
     if not name:
         return
@@ -638,9 +646,10 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
     # If the part is a THT resistor, change it's value if the parameter custom_res_color has
     # the resistor specifing a new value
     if lib == "Resistor_THT":
-        if custom_res_color is not None:
-            if ref in custom_res_color:
-                value = custom_res_color[ref]
+        if tht_resistor_settings is not None:
+            if ref in tht_resistor_settings:
+                if 'override_val' in tht_resistor_settings[ref]:
+                    value = tht_resistor_settings[ref]['override_val']
 
     unique_name = f"{lib}__{name}_{value}"
     if unique_name in usedComponents:
@@ -685,21 +694,37 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
 
         # If the library used is the THT resistor one, attempt to change the band colors if they exsist
         if lib == "Resistor_THT":
+            res, tollerance = None, '5%'
             try:
-                res = engineering_notation.EngNumber(value)
+                value = value.split(' ')
+                res = engineering_notation.EngNumber(value[0])
                 res = res.number
+                if len(value) >= 1:
+                    if '%' in value[1]:
+                        if value[1] not in style["tht-resistor-band-colors"]:
+                            raise UserWarning()
+                        tollerance = value[1]
             except decimal.InvalidOperation:
                 if not silent:
                     print("Resistor {}'s value is invalid".format(ref))
-            else:
+            except UserWarning:
+                if not silent:
+                    print("Resistor {}'s tollerance ({}) is invalid, assuming 5%".format(ref, value[1]))
+            if res is not None:
                 power = math.floor(res.log10())-1
                 res = int(res / 10**power)
                 resistor_colors = [
                     style["tht-resistor-band-colors"][int(str(res)[0])],
                     style["tht-resistor-band-colors"][int(str(res)[1])],
                     style["tht-resistor-band-colors"][int(power)],
-                    "#ffc800"       # TODO: Don't assume gold for the band
+                    style["tht-resistor-band-colors"][tollerance],
                 ]
+                if tht_resistor_settings is not None:
+                    if ref in tht_resistor_settings:
+                        if 'flip' in tht_resistor_settings[ref]:
+                            if tht_resistor_settings[ref]['flip']:
+                                resistor_colors.reverse()
+
                 for res_i, res_c in enumerate(resistor_colors):
                     band = componentElement.find(".//*[@id='{}res_band{}']".format(svg_prefix, res_i+1))
                     s = band.attrib["style"].split(";")
@@ -708,7 +733,7 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
                             s_split = s[i].split(':')
                             s_split[1] = res_c
                             s[i] = ':'.join(s_split)
-                        elif s[i].startswith('fill-opacity:'):
+                        elif s[i].startswith('opacity:'):
                             s_split = s[i].split(':')
                             s_split[1] = '1'
                             s[i] = ':'.join(s_split)
@@ -935,6 +960,7 @@ def main():
     parser.add_argument("--no-warn-back", action="store_true", help="Don't show warnings about back footprints")
     parser.add_argument("--shrink", type=float, help="Shrink the canvas size to the size of the board. Specify border in millimeters")
     parser.add_argument("--resistor-values", help="A comma seperated list of what value to set to each resistor for the band colors. For example, \"R1:10k,R2:470\"")
+    parser.add_argument("--resistor-flip", help="A comma seperated list of throughole resistors to flip the bands")
 
     args = parser.parse_args()
     libs = []
@@ -959,13 +985,18 @@ def main():
         if s not in style:
             style[s] = default_style[s]
 
-    resistor_values = None
+    tht_resistor_settings = {}
     if args.resistor_values:
-        resistor_values = {}
         split_list = args.resistor_values.split(",")
         for r in split_list:
             r_s = r.split(":")
-            resistor_values[r_s[0]] = r_s[1]
+            tht_resistor_settings[r_s[0]] = {'override_val': r_s[1]}
+    if args.resistor_flip:
+        for r in args.resistor_flip.split(","):
+            if r in tht_resistor_settings:
+                tht_resistor_settings[r]['flip'] = True
+            else:
+                tht_resistor_settings[r] = {'flip': True}
 
     if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png", ".jpg", ".jpeg"]:
         print("Output can be either an SVG, PNG or JPG file")
@@ -1036,13 +1067,13 @@ def main():
     usedComponents = {}
     walk_components(board, args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name, val, ref, pos, usedComponents,
-                               components, highlight, args.silent, args.no_warn_back, style, resistor_values))
+                               components, highlight, args.silent, args.no_warn_back, style, tht_resistor_settings))
 
     # make another pass for search, and if found, render the back side of the component
     # the function will search for file with extension ".back.svg"
     walk_components(board, not args.back, lambda lib, name, val, ref, pos:
         component_from_library(lib, name+".back", val, ref, pos, usedComponents,
-                                components, highlight, args.silent, args.no_warn_back, style, resistor_values))
+                                components, highlight, args.silent, args.no_warn_back, style, tht_resistor_settings))
 
     remove_empty_elems(document.getroot())
     remove_inkscape_annotation(document.getroot())
