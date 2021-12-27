@@ -31,7 +31,7 @@ setuptools.setup(
         "pyyaml",
         "click",
         "svgpathtools",
-        "pcbnewTransition"
+        "pcbnewTransition>=0.2"
     ],
     setup_requires=[
         "versioneer"
