@@ -24,8 +24,17 @@ pip3 install git+https://github.com/yaqwsx/PcbDraw@master
 
 ## Windows
 
-On Windows, you have to use KiCAD v5.99. To install KiKit on Windows, you have
-to open "KiCAD Command Prompt". You can find it in the start menu:
+On Windows, you have to use KiCAD v6. Before installation of PcbDraw, you also
+have to install
+[ImageMagick](https://imagemagick.org/script/download.php#windows)
+
+![resim](https://user-images.githubusercontent.com/11939537/147499827-575cd6b2-bad8-4795-a1cc-bb84920f083d.png)
+
+
+![resim](https://user-images.githubusercontent.com/11939537/147499795-84171203-5561-4240-8ae4-720ece1717fd.png)
+
+To install PcbDraw on Windows, you have to open "KiCAD Command Prompt". You can
+find it in the start menu:
 
 ![KiCAD Command Prompt in Start menu](resources/windowsCommandPrompt1.jpg)
 
@@ -33,10 +42,10 @@ Once you have it open like this:
 
 ![KiCAD Command Prompt in Start menu](resources/windowsCommandPrompt2.jpg)
 
-you can put command in there and confirm them by pressing
-enter. This is also the prompt from which you will invoke all KiKit's CLI
-commands. They, unfortunatelly, does not work in an ordinary Command prompt due
-to the way KiCAD is packaged on Windows.
+you can put command in there and confirm them by pressing enter. This is also
+the prompt from which you will invoke all PcbDraw's CLI commands. They,
+unfortunately, does not work in an ordinary Command prompt due to the way KiCAD
+is packaged on Windows.
 
 Then you have to enter:
 
