@@ -29,7 +29,6 @@ setuptools.setup(
         "pybars3",
         "wand",
         "pyyaml",
-        "click",
         "svgpathtools",
         "pcbnewTransition>=0.2"
     ],
