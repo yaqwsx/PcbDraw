@@ -282,6 +282,21 @@ def make_XML_identifier(s):
     s = re.sub('^[^a-zA-Z_]+', '', s)
     return s
 
+def extract_resistor_settings(args):
+    tht_resistor_settings = {}
+    if args.resistor_values:
+        split_list = args.resistor_values.split(",")
+        for r in split_list:
+            r_s = r.split(":")
+            tht_resistor_settings[r_s[0]] = {'override_val': r_s[1]}
+    if args.resistor_flip:
+        for r in args.resistor_flip.split(","):
+            if r in tht_resistor_settings:
+                tht_resistor_settings[r]['flip'] = True
+            else:
+                tht_resistor_settings[r] = {'flip': True}
+    return tht_resistor_settings
+
 def read_svg_unique(filename, return_prefix = False):
     prefix = unique_prefix() + "_"
     root = etree.parse(filename).getroot()
@@ -635,6 +650,56 @@ def component_to_board_scale(svg):
     x, y, vw, vh = [float(x) for x in svg.attrib["viewBox"].split()]
     return width / vw, height / vh
 
+def get_resistance_from_value(value, ref, style, silent):
+    res, tollerance = None, '5%'
+    try:
+        value = value.split(' ')
+        res = engineering_notation.EngNumber(value[0])
+        res = res.number
+        if len(value) > 1:
+            if '%' in value[1]:
+                if value[1] not in style["tht-resistor-band-colors"]:
+                    raise UserWarning("Resistor's tolerance is invalid")
+                tollerance = value[1]
+    except decimal.InvalidOperation:
+        if not silent:
+            print("Resistor {}'s value is invalid".format(ref))
+    except UserWarning:
+        if not silent:
+            print("Resistor {}'s tollerance ({}) is invalid, assuming 5%".format(ref, value[1]))
+
+    return res, tollerance
+
+def color_resistor(ref, svg_prefix, res, tolerance, style, tht_resistor_settings, componentElement):
+    if res is not None:
+        power = math.floor(res.log10())-1
+        res = int(res / 10**power)
+        resistor_colors = [
+            style["tht-resistor-band-colors"][int(str(res)[0])],
+            style["tht-resistor-band-colors"][int(str(res)[1])],
+            style["tht-resistor-band-colors"][int(power)],
+            style["tht-resistor-band-colors"][tolerance],
+        ]
+        if tht_resistor_settings is not None:
+            if ref in tht_resistor_settings:
+                if 'flip' in tht_resistor_settings[ref]:
+                    if tht_resistor_settings[ref]['flip']:
+                        resistor_colors.reverse()
+
+        for res_i, res_c in enumerate(resistor_colors):
+            band = componentElement.find(".//*[@id='{}res_band{}']".format(svg_prefix, res_i+1))
+            s = band.attrib["style"].split(";")
+            for i in range(len(s)):
+                if s[i].startswith('fill:'):
+                    s_split = s[i].split(':')
+                    s_split[1] = res_c
+                    s[i] = ':'.join(s_split)
+                elif s[i].startswith('display:'):
+                    s_split = s[i].split(':')
+                    s_split[1] = 'inline'
+                    s[i] = ':'.join(s_split)
+            band.attrib["style"] = ";".join(s)
+
 def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
                            highlight, silent, no_warn_back, style, tht_resistor_settings):
 
@@ -644,12 +709,10 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
         return
 
     # If the part is a THT resistor, change it's value if the parameter custom_res_color has
-    # the resistor specifing a new value
-    if lib == "Resistor_THT":
-        if tht_resistor_settings is not None:
-            if ref in tht_resistor_settings:
-                if 'override_val' in tht_resistor_settings[ref]:
-                    value = tht_resistor_settings[ref]['override_val']
+    if tht_resistor_settings is not None:
+        if ref in tht_resistor_settings:
+            if 'override_val' in tht_resistor_settings[ref]:
+                value = tht_resistor_settings[ref]['override_val']
 
     unique_name = f"{lib}__{name}_{value}"
     if unique_name in usedComponents:
@@ -693,51 +756,10 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
         usedComponents[unique_name] = componentInfo
 
         # If the library used is the THT resistor one, attempt to change the band colors if they exsist
-        if lib == "Resistor_THT":
-            res, tollerance = None, '5%'
-            try:
-                value = value.split(' ')
-                res = engineering_notation.EngNumber(value[0])
-                res = res.number
-                if len(value) >= 1:
-                    if '%' in value[1]:
-                        if value[1] not in style["tht-resistor-band-colors"]:
-                            raise UserWarning()
-                        tollerance = value[1]
-            except decimal.InvalidOperation:
-                if not silent:
-                    print("Resistor {}'s value is invalid".format(ref))
-            except UserWarning:
-                if not silent:
-                    print("Resistor {}'s tollerance ({}) is invalid, assuming 5%".format(ref, value[1]))
+        if componentElement.find(".//*[@id='{}res_band1']".format(svg_prefix)) is not None:
+            res, tolerance = get_resistance_from_value(value, ref, style, value)
             if res is not None:
-                power = math.floor(res.log10())-1
-                res = int(res / 10**power)
-                resistor_colors = [
-                    style["tht-resistor-band-colors"][int(str(res)[0])],
-                    style["tht-resistor-band-colors"][int(str(res)[1])],
-                    style["tht-resistor-band-colors"][int(power)],
-                    style["tht-resistor-band-colors"][tollerance],
-                ]
-                if tht_resistor_settings is not None:
-                    if ref in tht_resistor_settings:
-                        if 'flip' in tht_resistor_settings[ref]:
-                            if tht_resistor_settings[ref]['flip']:
-                                resistor_colors.reverse()
-
-                for res_i, res_c in enumerate(resistor_colors):
-                    band = componentElement.find(".//*[@id='{}res_band{}']".format(svg_prefix, res_i+1))
-                    s = band.attrib["style"].split(";")
-                    for i in range(len(s)):
-                        if s[i].startswith('fill:'):
-                            s_split = s[i].split(':')
-                            s_split[1] = res_c
-                            s[i] = ':'.join(s_split)
-                        elif s[i].startswith('opacity:'):
-                            s_split = s[i].split(':')
-                            s_split[1] = '1'
-                            s[i] = ':'.join(s_split)
-                    band.attrib["style"] = ";".join(s)
+                color_resistor(ref, svg_prefix, res, tolerance, style, tht_resistor_settings, componentElement)
 
     comp["container"].append(etree.Comment("{}:{}".format(lib, name)))
     r = etree.SubElement(comp["container"], "g")
@@ -980,23 +1002,16 @@ def main():
         print(e)
         sys.exit(1)
 
+    # Check if there any keys in the given style that aren't in the default style (all valid keys)
+    for s in style:
+        if s not in default_style:
+            raise UserWarning(f"Key {s} from the given style is invalid")
     # If some keys aren't in the loaded style compared to the default style, copy it from the default style
     for s in default_style:
         if s not in style:
             style[s] = default_style[s]
 
-    tht_resistor_settings = {}
-    if args.resistor_values:
-        split_list = args.resistor_values.split(",")
-        for r in split_list:
-            r_s = r.split(":")
-            tht_resistor_settings[r_s[0]] = {'override_val': r_s[1]}
-    if args.resistor_flip:
-        for r in args.resistor_flip.split(","):
-            if r in tht_resistor_settings:
-                tht_resistor_settings[r]['flip'] = True
-            else:
-                tht_resistor_settings[r] = {'flip': True}
+    tht_resistor_settings = extract_resistor_settings(args)
 
     if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png", ".jpg", ".jpeg"]:
         print("Output can be either an SVG, PNG or JPG file")
