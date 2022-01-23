@@ -452,7 +452,6 @@ def get_layers(board, colors, defs, toPlot):
                 pctl.SetLayer(l)
                 pctl.PlotLayer()
         pctl.ClosePlot()
-        board.SetVisibleAlls()
         boardsize = board.ComputeBoundingBox()
         for f, _, process in toPlot:
             for svg_file in os.listdir(tmp):
@@ -507,7 +506,6 @@ def get_board_substrate(board, colors, defs, holes, back):
                 pctl.SetLayer(l)
                 pctl.PlotLayer()
         pctl.ClosePlot()
-        board.SetVisibleAlls()
         boardsize = board.ComputeBoundingBox()
         for f, _, process in toPlot:
             for svg_file in os.listdir(tmp):
@@ -541,7 +539,6 @@ def get_hole_mask(board, defs):
     mask = etree.SubElement(defs, "mask", id="hole-mask")
     container = etree.SubElement(mask, "g")
 
-    board.SetVisibleAlls()
     bb = board.ComputeBoundingBox()
     bg = etree.SubElement(container, "rect", x="0", y="0", fill="white")
     bg.attrib["x"] = str(ki2svg(bb.GetX()))
@@ -917,7 +914,6 @@ def main():
                                         remapping=remapping))
         sys.exit(0)
 
-    board.SetVisibleAlls()
     bb = board.ComputeBoundingBox()
     transform_string = ""
     # Let me briefly explain what's going on. KiCAD outputs SVG in user units,
