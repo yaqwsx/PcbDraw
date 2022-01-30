@@ -287,13 +287,31 @@ def extract_svg_content(root):
             el.tag = el.tag.split('}', 1)[1]
     return [ x for x in root if x.tag and x.tag not in ["title", "desc"]]
 
-def strip_fill_svg(root):
+def strip_fill_svg(root, forbidden_colors):
     keys = ["fill", "stroke"]
+    elements_to_remove = []
     for el in root.getiterator():
         if "style" in el.attrib:
-            s = el.attrib["style"].split(";")
-            s = filter(lambda x: x.strip().split(":")[0] not in keys, s)
-            el.attrib["style"] = ";".join(s).replace("  ", " ").strip()
+            s = el.attrib["style"].strip().split(";")
+            styles = {}
+            for x in s:
+                if len(x) == 0:
+                    continue
+                key, val = tuple(x.split(":"))
+                key = key.strip()
+                val = val.strip()
+                styles[key] = val
+            fill = styles.get("fill", "").lower()
+            stroke = styles.get("stroke", "").lower()
+            if fill in forbidden_colors or stroke in forbidden_colors:
+                elements_to_remove.append(el)
+            el.attrib["style"] = ";" \
+                .join([f"{key}: {val}" for key, val in styles.items() if key not in keys]) \
+                .replace("  ", " ") \
+                .strip()
+    for el in elements_to_remove:
+        el.getparent().remove(el)
+    return root in elements_to_remove
 
 def empty_svg(**attrs):
     document = etree.ElementTree(etree.fromstring(
@@ -366,8 +384,10 @@ def process_board_substrate_layer(container, defs, name, source, colors, boardsi
     if name == "silk":
         layer.attrib["mask"] = "url(#pads-mask-silkscreen)"
     for element in extract_svg_content(read_svg_unique(source)):
-        strip_fill_svg(element)
-        layer.append(element)
+        # Forbidden colors = workaround - KiCAD plots vias white
+        # See https://gitlab.com/kicad/code/kicad/-/issues/10491
+        if not strip_fill_svg(element, forbidden_colors=["#ffffff"]):
+            layer.append(element)
 
 def process_board_substrate_base(container, defs, name, source, colors, boardsize):
     clipPath = etree.SubElement(defs, "clipPath")
@@ -380,8 +400,10 @@ def process_board_substrate_base(container, defs, name, source, colors, boardsiz
     outline = etree.SubElement(layer, "g",
         style="fill:{0}; stroke: {0};".format(colors["outline"]))
     for element in extract_svg_content(read_svg_unique(source)):
-        strip_fill_svg(element)
-        outline.append(element)
+        # Forbidden colors = workaround - KiCAD plots vias white
+        # See https://gitlab.com/kicad/code/kicad/-/issues/10491
+        if not strip_fill_svg(element, forbidden_colors=["#ffffff"]):
+            layer.append(element)
 
 def process_board_substrate_mask(container, defs, name, source, colors, boardsize):
     mask = etree.SubElement(defs, "mask")
@@ -491,7 +513,6 @@ def get_board_substrate(board, colors, defs, holes, back):
             for svg_file in os.listdir(tmp):
                 if svg_file.endswith("-" + f + ".svg"):
                     process(container, defs, f, os.path.join(tmp, svg_file), colors, boardsize)
-
     if holes:
         get_hole_mask(board, defs)
         container.attrib["mask"] = "url(#hole-mask)"
@@ -528,31 +549,44 @@ def get_hole_mask(board, defs):
     bg.attrib["width"] = str(ki2svg(bb.GetWidth()))
     bg.attrib["height"] = str(ki2svg(bb.GetHeight()))
 
+    toPlot = [] # Tuple: position, orientation, drillsize
     for module in board.GetFootprints():
         if module.GetPadCount() == 0:
             continue
         for pad in module.Pads():
-            pos = pad.GetPosition()
-            padOrientation = pad.GetOrientation()
-            pos.x = ki2svg(pos.x)
-            pos.y = ki2svg(pos.y)
-            size = list(map(ki2svg, pad.GetDrillSize()))
-            if size[0] > 0 and size[1] > 0:
-                if size[0] < size[1]:
-                    stroke = size[0]
-                    length = size[1] - size[0]
-                    points = "{} {} {} {}".format(0, -length / 2, 0, length / 2)
-                else:
-                    stroke = size[1]
-                    length = size[0] - size[1]
-                    points = "{} {} {} {}".format(-length / 2, 0, length / 2, 0)
-                el = etree.SubElement(container, "polyline")
-                el.attrib["stroke-linecap"] = "round"
-                el.attrib["stroke"] = "black"
-                el.attrib["stroke-width"] = str(stroke)
-                el.attrib["points"] = points
-                el.attrib["transform"] = "translate({} {}) rotate({})".format(
-                    pos.x, pos.y, -padOrientation / 10)
+            toPlot.append((
+                pad.GetPosition(),
+                pad.GetOrientation(),
+                pad.GetDrillSize()
+            ))
+    for track in board.GetTracks():
+        if not isinstance(track, pcbnew.PCB_VIA):
+            continue
+        toPlot.append((
+            track.GetPosition(),
+            0,
+            (track.GetDrillValue(), track.GetDrillValue())
+        ))
+    for pos, padOrientation, drillSize in toPlot:
+        pos.x = ki2svg(pos.x)
+        pos.y = ki2svg(pos.y)
+        size = list(map(ki2svg, drillSize))
+        if size[0] > 0 and size[1] > 0:
+            if size[0] < size[1]:
+                stroke = size[0]
+                length = size[1] - size[0]
+                points = "{} {} {} {}".format(0, -length / 2, 0, length / 2)
+            else:
+                stroke = size[1]
+                length = size[0] - size[1]
+                points = "{} {} {} {}".format(-length / 2, 0, length / 2, 0)
+            el = etree.SubElement(container, "polyline")
+            el.attrib["stroke-linecap"] = "round"
+            el.attrib["stroke"] = "black"
+            el.attrib["stroke-width"] = str(stroke)
+            el.attrib["points"] = points
+            el.attrib["transform"] = "translate({} {}) rotate({})".format(
+                pos.x, pos.y, -padOrientation / 10)
 
 def get_model_file(paths, lib, name, ref, remapping):
     """ Find model file in library considering component remapping """
