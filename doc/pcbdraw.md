@@ -65,6 +65,8 @@ There are several options for the script:
 - `--filter` take a comma separated list of components and show only them
 - `--shrink` take a border in millimeter and shrink the canvas to the actual
   board + component size
+- `--resistor-values` take a comma seperated colon delimited key-value pairs for manually setting a resistor's value, used for throughole resistors's band. For example, "R1:10k,R2:470 1%"
+- `--resistor-flip` take comma seperated list of throughole resistors to flip
 
 ## Breaking change in PcbDraw > v0.6
 
