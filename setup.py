@@ -30,7 +30,8 @@ setuptools.setup(
         "wand",
         "pyyaml",
         "svgpathtools==1.4.1",
-        "pcbnewTransition>=0.2"
+        "pcbnewTransition>=0.2",
+        "LnkParse3; platform_system=='Windows'"
     ],
     setup_requires=[
         "versioneer"
