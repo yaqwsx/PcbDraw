@@ -10,17 +10,13 @@ import tempfile
 import sysconfig
 import numpy as np
 import svgpathtools
-from itertools import islice
-import time
 import engineering_notation
 import decimal
 
-from wand.api import library
-from wand.color import Color
-from wand.image import Image
-
 from pcbnewTransition import pcbnew, KICAD_VERSION, isV6
 from lxml import etree, objectify
+
+from pcbdraw import convert
 
 
 # Give more priority to local modules than installed versions
@@ -795,23 +791,6 @@ def build_highlight(preset, width, height, pos, origin, scale, ref):
         f"translate({-origin[0]}, {-origin[1]})"
     h.attrib["id"] = "h_" + ref
 
-def svg_to_bitmap(infile, outfile, dpi=300):
-    with Image(resolution=dpi) as image:
-        with Color('transparent') as background_color:
-            library.MagickSetBackgroundColor(image.wand,
-                                            background_color.resource)
-        image.read(filename=infile, resolution=dpi)
-        _, ext = os.path.splitext(outfile)
-        if ext.lower() == ".png":
-            type = "png32"
-        elif ext.lower() in [".jpg", ".jpeg"]:
-            type = "jpeg"
-        else:
-            raise RuntimeError(f"Unsupported output image type {ext}")
-        bin_blob = image.make_blob(type)
-        with open(outfile, "wb") as out:
-            out.write(bin_blob)
-
 def find_data_file(name, ext, subdir):
     if os.path.isfile(name):
         return name
@@ -1013,8 +992,8 @@ def main():
 
     tht_resistor_settings = extract_resistor_settings(args)
 
-    if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png", ".jpg", ".jpeg"]:
-        print("Output can be either an SVG, PNG or JPG file")
+    if os.path.splitext(args.output)[-1].lower() not in [".svg", ".png"]:
+        print("Output can be either an SVG or PNG")
         sys.exit(1)
 
     try:
@@ -1102,7 +1081,7 @@ def main():
             tmp_f.flush()
             postprocess_svg(tmp_f.name, args.shrink)
             tmp_f.flush()
-            svg_to_bitmap(tmp_f.name, args.output, dpi=args.dpi)
+            convert.svgToPng(tmp_f.name, args.output, dpi=args.dpi)
             tmp_f.close()
             os.unlink(tmp_f.name)
 

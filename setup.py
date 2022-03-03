@@ -27,10 +27,10 @@ setuptools.setup(
         "lxml",
         "mistune",
         "pybars3",
-        "wand",
         "pyyaml",
         "svgpathtools==1.4.1",
         "pcbnewTransition>=0.2",
+        "engineering_notation",
         "LnkParse3; platform_system=='Windows'"
     ],
     setup_requires=[

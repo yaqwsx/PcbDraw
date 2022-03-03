@@ -2,10 +2,16 @@ import platform
 import subprocess
 import textwrap
 
+# Converting SVG to bitmap is a hard problem. We used Wand (and thus
+# imagemagick) to do the conversion. However, imagemagick is really hard to
+# configure properly and it breaks often. Therefore, we provide a custom module
+# that has several conversion strategies that reflect the platform. We also try
+# to provide descriptive enough message so the user can detect what is wrong.
+
 if platform.system() == "Windows":
     from pcbdraw.convert_windows import detectInkscape
 else:
-    from pcbdraw.convert_unix import detectInkscape
+    from pcbdraw.convert_unix import detectInkscape, rsvgSvgToPng
 
 def inkscapeSvgToPng(inputFilename, outputFilename, dpi):
     """
@@ -15,9 +21,9 @@ def inkscapeSvgToPng(inputFilename, outputFilename, dpi):
          f"--export-filename={outputFilename}", inputFilename]
     def reportError(message):
         raise RuntimeError(f"Cannot convert {inputFilename} to {outputFilename}. Inkscape failed with:\n"
-                            + textwrap.indent(message, "    "))   
+                            + textwrap.indent(message, "    "))
     try:
-        r = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        r = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = r.stdout.decode("utf-8") + "\n" + r.stderr.decode("utf-8")
         # Inkscape doesn't respect error codes
         if "Can't open file" in output:
@@ -36,9 +42,10 @@ def svgToPng(inputFilename, outputFilename, dpi=300):
         }
     else:
         strategies = {
-            "Inkscape": inkscapeSvgToPng
+            "RSVG": rsvgSvgToPng, # We prefer it over Inkscape as it is much faster
+            # "Inkscape": inkscapeSvgToPng
         }
-    
+
     errors = {}
     for name, strategy in strategies.items():
         try:
