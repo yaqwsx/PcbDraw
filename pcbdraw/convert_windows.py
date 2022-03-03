@@ -21,7 +21,9 @@ def detectInkscape():
                        "- if Inkscape is installed\n" +
                        "- if it is version at least 1.0\n" +
                        "If the conditions above are true, please ensure Inkscape is in PATH or\n" +
-                       "ensure there is environmental variable 'PCBDRAW_INKSCAPE' pointing to the Inkscape executable")
+                       "ensure there is environmental variable 'PCBDRAW_INKSCAPE' pointing to the Inkscape executable\n\n" +
+                       "Checked paths: \n" +
+                       "\n".join([f"- {x}" for x in candates]))
 
 def readInkscapeFromStartMenu():
     candidates = []
