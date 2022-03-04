@@ -30,3 +30,6 @@ def rsvgSvgToPng(inputFilename, outputFilename, dpi):
     except subprocess.CalledProcessError as e:
         output = e.stdout.decode("utf-8") + "\n" + e.stderr.decode("utf-8")
         reportError(output)
+    except FileNotFoundError as e:
+        reportError("rsvg-convert is not available. Please make sure it is installed.\n" +
+                    f"It was executed via invoking '{tool}'")
