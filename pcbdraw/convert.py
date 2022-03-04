@@ -43,7 +43,7 @@ def svgToPng(inputFilename, outputFilename, dpi=300):
     else:
         strategies = {
             "RSVG": rsvgSvgToPng, # We prefer it over Inkscape as it is much faster
-            # "Inkscape": inkscapeSvgToPng
+            "Inkscape": inkscapeSvgToPng
         }
 
     errors = {}
