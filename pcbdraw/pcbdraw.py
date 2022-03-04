@@ -592,7 +592,7 @@ def get_hole_mask(board, defs):
                 pad.GetDrillSize()
             ))
     for track in board.GetTracks():
-        if not isinstance(track, pcbnew.PCB_VIA):
+        if not isinstance(track, pcbnew.PCB_VIA) or not isV6(KICAD_VERSION):
             continue
         toPlot.append((
             track.GetPosition(),
