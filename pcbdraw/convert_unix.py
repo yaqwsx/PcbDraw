@@ -16,7 +16,8 @@ def detectInkscape():
     return chooseInkscapeCandidate(candidates)
 
 def rsvgSvgToPng(inputFilename, outputFilename, dpi):
-    command = ["rsvg-convert", "--dpi-x", str(dpi), "--dpi-y", str(dpi),
+    tool = os.environ.get("PCBDRAW_RSVG", "rsvg-convert")
+    command = [tool, "--dpi-x", str(dpi), "--dpi-y", str(dpi),
                "--output", outputFilename, "--format", "png", inputFilename]
     def reportError(message):
         raise RuntimeError(f"Cannot convert {inputFilename} to {outputFilename}. RSVG failed with:\n"

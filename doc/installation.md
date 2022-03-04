@@ -2,9 +2,8 @@
 
 PcbDraw is a stand-alone CLI tool. It is not an action plugin for KiCAD and
 therefore, it has no menu inside Pcbnew. PcbDraw is compatible with both, KiCAD
-v5 and KiCAD v5.99 (the upcoming v6 release). However, on **Windows and MacOS it
-works only with v5.99** (due to limitations in KiCAD). If you would like to use
-PcbDraw on Windows, you can run it via Docker as described below.
+v5 and v6. However, on **Windows and MacOS it works only with v6** (due to
+limitations in KiCAD).
 
 ## Linux & MacOS
 
@@ -22,19 +21,17 @@ install it directly from GitHub:
 pip3 install git+https://github.com/yaqwsx/PcbDraw@master
 ```
 
+PcbDraw also requires either Inkscape 1.x or librsvg installed to perform
+conversion from vector to rater images. The executables `inkscape` or
+`rsvg-convert` have to be in PATH. Optionally, you can specify environmental
+variables `PCBDRAW_INKSCAPE` or `PCBDRAW_RSVG` with paths to the tools. If they
+are set, PcbDraw will use these paths.
+
 ## Windows
 
-On Windows, you have to use KiCAD v6. Before installation of PcbDraw, you also
-have to install
-[ImageMagick](https://imagemagick.org/script/download.php#windows)
-
-![resim](https://user-images.githubusercontent.com/11939537/147499827-575cd6b2-bad8-4795-a1cc-bb84920f083d.png)
-
-
-![resim](https://user-images.githubusercontent.com/11939537/147499795-84171203-5561-4240-8ae4-720ece1717fd.png)
-
-To install PcbDraw on Windows, you have to open "KiCAD Command Prompt". You can
-find it in the start menu:
+On Windows, you have to use KiCAD v6 and also, you have to install Inkscape 1.x.
+PcbDraw doesn't work with Inkscape 0.9x. To install PcbDraw on Windows, you have
+to open "KiCAD Command Prompt". You can find it in the start menu:
 
 ![KiCAD Command Prompt in Start menu](resources/windowsCommandPrompt1.jpg)
 
