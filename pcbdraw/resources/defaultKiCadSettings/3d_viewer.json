@@ -1,0 +1,186 @@
+{
+  "appearance": {
+    "color_theme": "_builtin_default"
+  },
+  "camera": {
+    "animation_enabled": true,
+    "moving_speed_multiplier": 3,
+    "projection_mode": 1,
+    "rotation_increment": 10.0
+  },
+  "color_picker": {
+    "default_tab": 0
+  },
+  "cross_probing": {
+    "auto_highlight": true,
+    "center_on_items": true,
+    "zoom_to_fit": true
+  },
+  "find_replace": {
+    "find_history": [],
+    "find_string": "",
+    "flags": 1,
+    "replace_history": [],
+    "replace_string": ""
+  },
+  "graphics": {
+    "canvas_type": 2,
+    "high_contrast_factor": 0.3499999940395355,
+    "highlight_factor": 0.5,
+    "select_factor": 0.75
+  },
+  "lib_tree": {
+    "column_width": 360
+  },
+  "meta": {
+    "version": 2
+  },
+  "printing": {
+    "background": false,
+    "color_theme": "",
+    "layers": [],
+    "monochrome": true,
+    "scale": 1.0,
+    "title_block": false,
+    "use_theme": false
+  },
+  "render": {
+    "clip_silk_on_via_annulus": false,
+    "engine": 1,
+    "grid_type": 0,
+    "material_mode": 0,
+    "opengl_AA_disableOnMove": false,
+    "opengl_AA_mode": 3,
+    "opengl_copper_thickness": false,
+    "opengl_highlight_on_rollover": true,
+    "opengl_holes_disableOnMove": false,
+    "opengl_render_bbox_only_OnMove": false,
+    "opengl_selection_color": "rgb(0, 255, 0)",
+    "opengl_show_model_bbox": false,
+    "opengl_thickness_disableOnMove": false,
+    "opengl_vias_disableOnMove": false,
+    "plated_and_bare_copper": false,
+    "raytrace_anti_aliasing": true,
+    "raytrace_backfloor": false,
+    "raytrace_lightAzimuth": [
+      45,
+      135,
+      225,
+      315,
+      45,
+      135,
+      225,
+      315
+    ],
+    "raytrace_lightColor": [
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)",
+      "rgb(43, 43, 43)"
+    ],
+    "raytrace_lightColorBottom": "rgb(63, 63, 63)",
+    "raytrace_lightColorCamera": "rgb(51, 51, 51)",
+    "raytrace_lightColorTop": "rgb(63, 63, 63)",
+    "raytrace_lightElevation": [
+      67,
+      67,
+      67,
+      67,
+      -67,
+      -67,
+      -67,
+      -67
+    ],
+    "raytrace_nrsamples_reflections": 3,
+    "raytrace_nrsamples_refractions": 4,
+    "raytrace_nrsamples_shadows": 3,
+    "raytrace_post_processing": true,
+    "raytrace_procedural_textures": true,
+    "raytrace_recursivelevel_reflections": 3,
+    "raytrace_recursivelevel_refractions": 2,
+    "raytrace_reflections": true,
+    "raytrace_refractions": true,
+    "raytrace_shadows": true,
+    "raytrace_spread_reflections": 0.02500000037252903,
+    "raytrace_spread_refractions": 0.02500000037252903,
+    "raytrace_spread_shadows": 0.05000000074505806,
+    "realistic": true,
+    "show_adhesive": true,
+    "show_axis": true,
+    "show_board_body": true,
+    "show_comments": true,
+    "show_eco": true,
+    "show_footprints_insert": true,
+    "show_footprints_normal": true,
+    "show_footprints_virtual": true,
+    "show_silkscreen": true,
+    "show_soldermask": true,
+    "show_solderpaste": true,
+    "show_zones": true,
+    "subtract_mask_from_silk": false
+  },
+  "system": {
+    "file_history": [],
+    "first_run_shown": false,
+    "last_imperial_units": 0,
+    "last_metric_units": 1,
+    "max_undo_items": 0,
+    "units": 1
+  },
+  "window": {
+    "cursor": {
+      "always_show_cursor": true,
+      "fullscreen_cursor": false
+    },
+    "display": 2,
+    "grid": {
+      "axes_enabled": false,
+      "fast_grid_1": 4,
+      "fast_grid_2": 5,
+      "last_size": 4,
+      "line_width": 1.0,
+      "min_spacing": 10.0,
+      "show": true,
+      "sizes": [
+        "1000 mil",
+        "500 mil",
+        "250 mil",
+        "200 mil",
+        "100 mil",
+        "50 mil",
+        "25 mil",
+        "20 mil",
+        "10 mil",
+        "5 mil",
+        "2 mil",
+        "1 mil",
+        "5.0 mm",
+        "2.5 mm",
+        "1.0 mm",
+        "0.5 mm",
+        "0.25 mm",
+        "0.2 mm",
+        "0.1 mm",
+        "0.05 mm",
+        "0.025 mm",
+        "0.01 mm"
+      ],
+      "snap": 0,
+      "style": 0,
+      "user_grid_x": "10 mil",
+      "user_grid_y": "10 mil"
+    },
+    "maximized": false,
+    "mru_path": "",
+    "perspective": "layout2|name=MainToolbar;caption=;state=139632;dir=1;layer=6;row=0;pos=0;prop=100000;bestw=802;besth=34;minw=-1;minh=-1;maxw=-1;maxh=-1;floatx=-1;floaty=-1;floatw=-1;floath=-1|name=InfoBar;caption=;state=131454;dir=1;layer=1;row=0;pos=0;prop=100000;bestw=20;besth=30;minw=-1;minh=-1;maxw=-1;maxh=-1;floatx=-1;floaty=-1;floatw=-1;floath=-1|name=DrawFrame;caption=;state=1020;dir=5;layer=0;row=0;pos=0;prop=100000;bestw=1920;besth=1020;minw=-1;minh=-1;maxw=-1;maxh=-1;floatx=-1;floaty=-1;floatw=-1;floath=-1|dock_size(1,6,0)=34|dock_size(5,0,0)=576|",
+    "pos_x": 0,
+    "pos_y": 18,
+    "size_x": 1920,
+    "size_y": 1162,
+    "zoom_factors": []
+  }
+}

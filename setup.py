@@ -30,8 +30,11 @@ setuptools.setup(
         "pyyaml",
         "svgpathtools==1.4.1",
         "pcbnewTransition>=0.2",
-        "engineering_notation",
-        "LnkParse3; platform_system=='Windows'"
+        "engineering_notation~=0.6.0",
+        "LnkParse3; platform_system=='Windows'",
+        "pyVirtualDisplay~=3.0; platform_system!='Windows'",
+        "Pillow~=9.0",
+        "click>=7.1"
     ],
     setup_requires=[
         "versioneer"
