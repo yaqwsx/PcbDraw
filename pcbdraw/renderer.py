@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from tempfile import TemporaryDirectory
 from typing import Callable, Dict, List, Optional, Tuple, Union
+from pathlib import Path
 
 import click
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
@@ -268,14 +269,16 @@ def duplicateKiCadSettings(outputDir: str) -> None:
     """
     Get KiCAD settings and make exact copy in outputdir
     """
-    source = pcbnew.SETTINGS_MANAGER().GetUserSettingsPath()
-    os.mkdir(outputDir)
-    for f in os.listdir(source):
-        path = os.path.join(source, f)
-        if os.path.isfile(path):
-            shutil.copy(path, outputDir)
-        else:
-            shutil.copytree(os.path.join(source, f), os.path.join(outputDir, f))
+    # The argument of constructor creates a headless manager
+    source = pcbnew.SETTINGS_MANAGER(True).GetUserSettingsPath()
+    Path(outputDir).mkdir(parents=True, exist_ok=True)
+    if os.path.exists(source):
+        for f in os.listdir(source):
+            path = os.path.join(source, f)
+            if os.path.isfile(path):
+                shutil.copy(path, outputDir)
+            else:
+                shutil.copytree(os.path.join(source, f), os.path.join(outputDir, f))
 
 
 @contextlib.contextmanager
@@ -299,6 +302,7 @@ def startPcbnewSession(resolution: Tuple[int, int]=(3000, 3000),
                 duplicateKiCadSettings(kicadConfigDir)
                 shutil.copy(os.path.join(PKG_BASE, "resources", "defaultKiCadSettings", "3d_viewer.json"),
                             os.path.join(kicadConfigDir, "3d_viewer.json"))
+                Path(os.path.join(kicadConfigDir, "colors")).mkdir(parents=True, exist_ok=True)
                 shutil.copy(os.path.join(PKG_BASE, "resources", "defaultKiCadSettings", "user_colors.json"),
                             os.path.join(kicadConfigDir, "colors", "user.json"))
                 if adjustConfig is not None:
