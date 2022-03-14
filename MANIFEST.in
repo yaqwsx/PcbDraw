@@ -1,5 +1,7 @@
 recursive-include pcbdraw/footprints *.svg
 recursive-include pcbdraw/styles *.json
+recursive-include pcbdraw/resources *
+
 recursive-include pcbdraw/templates *include versioneer.py
 include pcbdraw/_version.py
 include versioneer.py
