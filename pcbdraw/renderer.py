@@ -9,13 +9,13 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from tempfile import TemporaryDirectory
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import click
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from pyvirtualdisplay.smartdisplay import SmartDisplay
 
-from pcbnew_common import findBoardBoundingBox, pcbnew
+from .pcbnew_common import findBoardBoundingBox, pcbnew
 
 PKG_BASE = os.path.dirname(__file__)
 DEBUG_PATH = None
@@ -221,7 +221,7 @@ class ViewerSession:
         # Enable it
         self._sendKeys(["alt+p", "Return"])
         time.sleep(1)
-        self._parent.waitForImmovable(delta=2)
+        self._parent.waitForImmovable(delta=2, timeout=(3 * 60))
         img = self._parent.getScreenshot()
         # Disable it
         self._sendKeys(["alt+p", "Return"])
@@ -337,7 +337,7 @@ def findBoard(image: Image.Image) -> Tuple[int, int, int, int]:
     box = edges.getbbox()
     assert box is not None
     a, b, c, d = box
-    return a + 5, b + 5, c + 5, d + 5
+    return a + 5, b + 5, c + 6, d + 6
 
 class Side(Enum):
     FRONT = 0
@@ -347,8 +347,8 @@ def noPostProcessing(plan: RenderAction, substrate: Image.Image,
                      board: Image.Image) -> Image.Image:
     return board
 
-def postProcessCrop(boardFile: str, verticalPadding: int, horizontalPadding: int,
-                    makeTransparent: bool=False) \
+def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
+                    horizontalPadding: int, makeTransparent: bool=False) \
         -> Callable[[RenderAction, Image.Image, Image.Image], Tuple[Image.Image, Tuple[int, int, int, int]]]:
     """
     Generates a post-processing function that detects the board and crops it
@@ -356,7 +356,8 @@ def postProcessCrop(boardFile: str, verticalPadding: int, horizontalPadding: int
     coordinates of top-left and bottom-right corner of the image. The
     coordinates only work correctly when the board is rendered without orientation
     """
-    board = pcbnew.LoadBoard(boardFile)
+    if isinstance(board, str):
+        board = pcbnew.LoadBoard(board)
     bBox = findBoardBoundingBox(board)
     def f(plan: RenderAction, substrate: Image.Image, board: Image.Image) -> Image.Image:
         stlx, stly, sbrx, sbry = findBoard(substrate)
@@ -367,7 +368,7 @@ def postProcessCrop(boardFile: str, verticalPadding: int, horizontalPadding: int
 
         if makeTransparent:
             board = board.convert("RGBA")
-            ImageDraw.floodfill(board, (1, 1), (0, 0, 0, 0), thresh=160)
+            ImageDraw.floodfill(board, (1, 1), (0, 0, 0, 0), thresh=10)
 
         btlx -= pxHPadding
         bbrx += pxHPadding
@@ -424,6 +425,8 @@ class RenderAction:
         else:
             img = viewer.captureRendered(withComponents=self.components)
         viewer.toggleAxisIndicator()
+        if self.orthographic:
+            viewer.toggleOrthographic()
         if self.postprocess is None:
             return img
         return self.postprocess(self, substrate, img)
@@ -506,8 +509,9 @@ def demoRun(inputboard):
         RenderAction(
             side=Side.FRONT,
             raytraced=True,
-            rotX=30,
-            rotY=30,
+            orthographic=True,
+            rotX=0,
+            rotY=0,
             postprocess=postProcessCrop(
                 inputboard,
                 verticalPadding=0, horizontalPadding=0,
@@ -519,14 +523,19 @@ def demoRun(inputboard):
             orthographic=True,
             postprocess=postProcessCrop(
                 inputboard,
-                verticalPadding=pcbnew.FromMM(0.5),
-                horizontalPadding=pcbnew.FromMM(0.5),
+                verticalPadding=pcbnew.FromMM(5),
+                horizontalPadding=pcbnew.FromMM(5),
                 makeTransparent=True)
         )
     ]
-    images = renderBoard(inputboard, renderPlan,
-        bgColor1=(255, 255, 255),
-        bgColor2=(255, 255, 255))
+    try:
+        images = renderBoard(inputboard, renderPlan,
+            bgColor1=(255, 255, 255),
+            bgColor2=(255, 255, 255))
+    except GuiPuppetError as e:
+        print(e)
+        e.show()
+        raise e
 
     for i, (img, pos) in enumerate(images):
         print(pos)
