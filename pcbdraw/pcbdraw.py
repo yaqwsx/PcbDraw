@@ -620,22 +620,26 @@ def get_hole_mask(board, defs):
             el.attrib["transform"] = "translate({} {}) rotate({})".format(
                 pos.x, pos.y, -padOrientation / 10)
 
-def get_model_file(paths, lib, name, ref, remapping):
+def resolve_remapping(lib, name, ref, remapping):
+    if ref in remapping:
+        lib, new_name = tuple(remapping[ref].split(":"))
+        if name.endswith(".back"):
+            name = new_name + ".back"
+        else:
+            name = new_name
+    return lib, name
+
+def get_model_file(paths, lib, name, ref):
     """ Find model file in library considering component remapping """
     for path in paths:
-        if ref in remapping:
-            lib, new_name = tuple(remapping[ref].split(":"))
-            if name.endswith(".back"):
-                name = new_name + ".back"
-            else:
-                name = new_name
         f = os.path.join(path, lib, name + ".svg")
         if os.path.isfile(f):
             return f
     return None
 
 def print_component(paths, lib, name, value, ref, pos, remapping={}):
-    f = get_model_file(paths, lib, name, ref, remapping)
+    name, lib = resolve_remapping(lib, name, ref, remapping)
+    f = get_model_file(paths, lib, name, ref)
     msg = "{} with package {}:{} at [{},{},{}] -> {}".format(
         ref, lib, name, pos[0], pos[1], math.degrees(pos[2]), f if f else "Not found")
     print(msg)
@@ -710,12 +714,14 @@ def component_from_library(lib, name, value, ref, pos, usedComponents, comp,
             if 'override_val' in tht_resistor_settings[ref]:
                 value = tht_resistor_settings[ref]['override_val']
 
+    lib, name = resolve_remapping(lib, name, ref, comp["remapping"])
+
     unique_name = f"{lib}__{name}_{value}"
     if unique_name in usedComponents:
         componentInfo = usedComponents[unique_name]
         componentElement = etree.Element("use", attrib={"{http://www.w3.org/1999/xlink}href": "#" + componentInfo["id"]})
     else:
-        f = get_model_file(comp["libraries"], lib, name, ref, comp["remapping"])
+        f = get_model_file(comp["libraries"], lib, name, ref)
         if not f:
             if not silent:
                 if name[-5:] != '.back' or not no_warn_back:
