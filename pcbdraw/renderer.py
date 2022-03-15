@@ -23,7 +23,9 @@ DEBUG_PATH = None
 DEBUG_PATH = "/imgs"
 
 dbgCounter = 1
+
 def debugSave(img):
+    global dbgCounter
     img.save(os.path.join(DEBUG_PATH, f"DBG-{dbgCounter}.png"))
     dbgCounter += 1
 
