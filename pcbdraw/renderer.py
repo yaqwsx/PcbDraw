@@ -121,14 +121,23 @@ class PcbnewSession:
         displayWidth, displayHeight = self._display._size
         return image.crop((30, 80, displayWidth - 30, displayHeight - 50))
 
-    def waitForImmovable(self, delta: float=0.5, timeout: float=60) -> None:
+    def waitForImmovable(self, delta: float=0.1, threshold: int=10, timeout: float=60) -> None:
+        """
+        Wait until the screen is immovable. Scan the screen every delta seconds
+        and if they haven't changed for threshold iterations, stop.
+        """
         start = time.time()
         base = self.getScreenshot()
+        stableFor = 0
         while True:
             time.sleep(delta)
             current = self.getScreenshot()
             diff = ImageChops.difference(base, current)
             if diff.getbbox() is None:
+                stableFor += 1
+            else:
+                stableFor = 0
+            if stableFor >= threshold:
                 return
             base = current
             if time.time() - start > timeout:
@@ -203,31 +212,31 @@ class ViewerSession:
     def showFront(self) -> None:
         self._sendKeys(["z"])
         time.sleep(0.5)
-        self._parent.waitForImmovable()
+        self._parent.waitForImmovable(threshold=20)
 
     def showBack(self) -> None:
         self._sendKeys(["Shift+z"])
         time.sleep(0.5)
-        self._parent.waitForImmovable()
+        self._parent.waitForImmovable(threshold=20)
 
     def toggleAxisIndicator(self) -> None:
         self._sendKeys(["alt+p"] + 6 * ["Down"] + ["Return"])
+        self._parent.waitForImmovable(threshold=20)
 
     def toggleComponents(self) -> None:
         self._sendKeys(["T", "S", "V"])
+        self._parent.waitForImmovable(threshold=20)
 
     def captureRaytraced(self, withComponents: bool=True) -> Optional[Image.Image]:
         if not withComponents:
             self.toggleComponents()
         # Enable it
         self._sendKeys(["alt+p", "Return"])
-        time.sleep(1)
-        self._parent.waitForImmovable(delta=2, timeout=(3 * 60))
+        self._parent.waitForImmovable(threshold=50, timeout=(3 * 60))
         img = self._parent.getScreenshot()
         # Disable it
         self._sendKeys(["alt+p", "Return"])
-        time.sleep(1)
-        self._parent.waitForImmovable(delta=1)
+        self._parent.waitForImmovable(threshold=10)
         if not withComponents:
             self.toggleComponents()
         return img
