@@ -20,6 +20,12 @@ from .pcbnew_common import findBoardBoundingBox, pcbnew
 
 PKG_BASE = os.path.dirname(__file__)
 DEBUG_PATH = None
+DEBUG_PATH = "/imgs"
+
+dbgCounter = 1
+def debugSave(img):
+    img.save(os.path.join(DEBUG_PATH, f"DBG-{dbgCounter}.png"))
+    dbgCounter += 1
 
 
 class GuiPuppetError(RuntimeError):
@@ -62,6 +68,8 @@ class PcbnewSession:
         Run xdotool with arguments and return its output.
         """
         command = ["xdotool"] + [str(x) for x in args]
+        if args[0] != "getwindowname":
+            print(command)
         c = subprocess.run(command, capture_output=True)
         output = c.stdout.decode("utf-8")
         return [x.strip() for x in output.split("\n") if len(x.strip())]
@@ -77,6 +85,7 @@ class PcbnewSession:
             name = self._xdotool(["getwindowname", winId])
             if len(name):
                 res[name[0]] = int(winId)
+        print(res)
         return res
 
     def waitForWindow(self, titlePattern: str, timeout: int=60,
@@ -337,7 +346,9 @@ def findBoard(image: Image.Image) -> Tuple[int, int, int, int]:
     edges = image.convert("L") \
         .filter(ImageFilter.FIND_EDGES) \
         .point( lambda p: 255 if p > 127 else 0 )
+    debugSave(edges)
     edges = edges.crop((5, 5, edges.width - 5, edges.height - 5))
+    debugSave(edges)
     box = edges.getbbox()
     assert box is not None
     a, b, c, d = box
@@ -363,7 +374,10 @@ def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
     if isinstance(board, str):
         board = pcbnew.LoadBoard(board)
     bBox = findBoardBoundingBox(board)
+    print(f"Board bbox: {bBox.GetX()}, {bBox.GetY()}, {bBox.GetWidth()}, {bBox.GetHeight()}")
     def f(plan: RenderAction, substrate: Image.Image, board: Image.Image) -> Image.Image:
+        debugSave(substrate)
+        debugSave(board)
         stlx, stly, sbrx, sbry = findBoard(substrate)
         ratio = bBox.GetWidth() / (sbrx - stlx) # Number of KiCAD units per pixel
         pxVPadding = verticalPadding / ratio
@@ -373,6 +387,7 @@ def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
         if makeTransparent:
             board = board.convert("RGBA")
             ImageDraw.floodfill(board, (1, 1), (0, 0, 0, 0), thresh=10)
+            debugSave(board)
 
         btlx -= pxHPadding
         bbrx += pxHPadding
