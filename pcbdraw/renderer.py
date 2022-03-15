@@ -214,15 +214,16 @@ class ViewerSession:
     def showFront(self) -> None:
         self._sendKeys(["z"])
         time.sleep(0.5)
-        self._parent.waitForImmovable()
+        self._parent.waitForImmovable(delta=1)
 
     def showBack(self) -> None:
         self._sendKeys(["Shift+z"])
         time.sleep(0.5)
-        self._parent.waitForImmovable()
+        self._parent.waitForImmovable(delta=1)
 
     def toggleAxisIndicator(self) -> None:
         self._sendKeys(["alt+p"] + 6 * ["Down"] + ["Return"])
+        time.sleep(0.5)
 
     def toggleComponents(self) -> None:
         self._sendKeys(["T", "S", "V"])
@@ -233,7 +234,8 @@ class ViewerSession:
         # Enable it
         self._sendKeys(["alt+p", "Return"])
         time.sleep(1)
-        self._parent.waitForImmovable(delta=2, timeout=(3 * 60))
+        self._parent.waitForImmovable(delta=4, timeout=(3 * 60))
+        time.sleep(2) # Often we stop changing and we miss the last step of illumination
         img = self._parent.getScreenshot()
         # Disable it
         self._sendKeys(["alt+p", "Return"])
