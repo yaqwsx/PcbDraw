@@ -159,6 +159,9 @@ class PcbnewSession:
         if "Configure Global Footprint Library Table" in windows.keys():
             id = windows["Configure Global Footprint Library Table"]
             self._xdotool(["key", "--window", id, "Return"])
+        if "KiCad PCB Editor" in windows.keys():
+            id = windows["KiCad PCB Editor"]
+            self._xdotool(["key", "--window", id, "Return"])
         if "File Open Error" in windows.keys():
             raise RuntimeError("File Open Error")
 

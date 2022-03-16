@@ -10,6 +10,7 @@ setuptools.setup(
     name="PcbDraw",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
+    python_requires=">=3.7",
     author="Jan Mrázek",
     author_email="email@honzamrazek.cz",
     description="Utility to produce nice looking drawings of KiCAD boards",
@@ -43,8 +44,7 @@ setuptools.setup(
     include_package_data=True,
     entry_points = {
         "console_scripts": [
-            "pcbdraw=pcbdraw.pcbdraw:main",
-            "populate=pcbdraw.populate:main"
+            "pcbdraw=pcbdraw.ui:run"
         ],
     }
 )

@@ -1,6 +1,11 @@
 import platform
 import subprocess
 import textwrap
+import os
+from typing import Union
+from tempfile import TemporaryDirectory
+from PIL import Image
+from lxml.etree import _ElementTree
 
 # Converting SVG to bitmap is a hard problem. We used Wand (and thus
 # imagemagick) to do the conversion. However, imagemagick is really hard to
@@ -58,6 +63,36 @@ def svgToPng(inputFilename, outputFilename, dpi=300):
         m = f"- Strategy '{name}' failed with: {textwrap.indent(error, '  ')}\n"
         message += textwrap.indent(m, "  ")
     raise RuntimeError(message)
+
+def save(image: Union[_ElementTree, Image.Image], filename: str, dpi: int=600):
+    """
+    Given an SVG tree or an image, save to a filename. The format is deduced
+    from the extension.
+    """
+    ftype = os.path.splitext(filename)[1][1:].lower()
+    if isinstance(image, Image.Image):
+        if ftype not in ["jpg", "jpeg", "png", "bmp"]:
+            raise TypeError(f"Cannot save bitmap image into {ftype}")
+        image.save(filename)
+        return
+    if isinstance(image, _ElementTree):
+        if ftype == "svg":
+            image.write(filename)
+            return
+        with TemporaryDirectory() as d:
+            svg_filename = os.path.join(d, "image.svg")
+            if ftype == "png":
+                png_filename = filename
+            else:
+                png_filename = os.path.join(d, "image.png")
+            image.write(svg_filename)
+            svgToPng(svg_filename, png_filename, dpi=dpi)
+            if ftype == "png":
+                return
+            Image.open(png_filename).convert("RGB").save(filename)
+            return
+    raise TypeError(f"Unknown image type: {type(image)}")
+
 
 if __name__ == "__main__":
     import sys
