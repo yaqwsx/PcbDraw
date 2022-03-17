@@ -116,7 +116,7 @@ class WarningStderrReporter:
     help="Add paste layer")
 @click.option("--components/--no-components", default=True,
     help="Render components")
-@click.option("--outline-width", type=int, default=0.15,
+@click.option("--outline-width", type=float, default=0.15,
     help="Outline width in mm")
 def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
          mirror, highlight, filter, vcuts, dpi, margin, silent, werror,

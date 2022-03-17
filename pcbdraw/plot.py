@@ -1092,9 +1092,6 @@ class PcbPlotter():
         for l in self.libs:
             self._libs_path += [os.path.join(p, l) for p in self.data_path]
         self._libs_path = [x for x in self._libs_path if os.path.exists(x)]
-        print(self.libs)
-        print(self.data_path)
-        print(self._libs_path)
 
     def _get_model_file(self, lib, name) -> Optional[str]:
         """
