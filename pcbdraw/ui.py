@@ -13,6 +13,7 @@ from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
                    mm2ki)
 from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
                        renderBoard, validateExternalPrerequisites)
+from .populate import populate
 
 
 class Layer(IntEnum):
@@ -262,6 +263,7 @@ def run():
 
 run.add_command(render)
 run.add_command(plot)
+run.add_command(populate)
 
 if __name__ == "__main__":
     run()

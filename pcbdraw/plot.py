@@ -19,7 +19,6 @@ import svgpathtools
 from lxml import etree, objectify
 from pcbnewTransition import KICAD_VERSION, isV6, pcbnew
 
-# Give more priority to local modules than installed versions
 PKG_BASE = os.path.dirname(__file__)
 
 etree.register_namespace("xlink", "http://www.w3.org/1999/xlink")
@@ -211,6 +210,38 @@ def element_position(element, root=None):
     trans = collect_transformation(element, root=r)
     position = np.matmul(trans, position)
     return position[0][0] / position[2][0], position[1][0] / position[2][0]
+
+def get_global_datapaths() -> List[str]:
+    paths = []
+    share = os.path.join('share', 'pcbdraw')
+    scheme_names = sysconfig.get_scheme_names()
+    if os.name == 'posix':
+        if 'posix_user' in scheme_names:
+            paths.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
+        if 'posix_prefix' in scheme_names:
+            paths.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
+    elif os.name == 'nt':
+        if 'nt_user' in scheme_names:
+            paths.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
+        if 'nt' in scheme_names:
+            paths.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
+    if len(paths) == 0:
+        paths.append(os.path.join(sysconfig.get_path('data'), share))
+    return paths
+
+def find_data_file(name: str, extension: str, data_paths: List[str], subdir: Optional[str]=None) -> Optional[str]:
+    if not name.endswith(extension):
+        name += extension
+    if os.path.isfile(name):
+        return name
+    for path in data_paths:
+        if subdir is not None:
+            fname = os.path.join(path, subdir, name)
+        else:
+            fname = os.path.join(path, name)
+        if os.path.isfile(fname):
+            return fname
+    return None
 
 def ki2dmil(val):
     return val // 2540
@@ -1037,21 +1068,7 @@ class PcbPlotter():
         """
         Add global installation paths to the search path for libraries.
         """
-        share = os.path.join('share', 'pcbdraw')
-        entries = len(self.data_path)
-        scheme_names = sysconfig.get_scheme_names()
-        if os.name == 'posix':
-            if 'posix_user' in scheme_names:
-                self.data_path.append(os.path.join(sysconfig.get_path('data', 'posix_user'), share))
-            if 'posix_prefix' in scheme_names:
-                self.data_path.append(os.path.join(sysconfig.get_path('data', 'posix_prefix'), share))
-        elif os.name == 'nt':
-            if 'nt_user' in scheme_names:
-                self.data_path.append(os.path.join(sysconfig.get_path('data', 'nt_user'), share))
-            if 'nt' in scheme_names:
-                self.data_path.append(os.path.join(sysconfig.get_path('data', 'nt'), share))
-        if len(self.data_path) == entries:
-            self.data_path.append(os.path.join(sysconfig.get_path('data'), share))
+        self.data_path += get_global_datapaths()
 
     def setup_arbitrary_data_path(self, path: str) -> None:
         """
@@ -1077,15 +1094,7 @@ class PcbPlotter():
         self.style = load_style(name)
 
     def _find_data_file(self, name: str, extension: str) -> Optional[str]:
-        if not name.endswith(extension):
-            name += extension
-        if os.path.isfile(name):
-            return name
-        for path in self.data_path:
-            fname = os.path.join(path, name)
-            if os.path.isfile(fname):
-                return fname
-        return None
+        return find_data_file(name, extension, self.data_path)
 
     def _build_libs_path(self) -> None:
         self._libs_path = []
