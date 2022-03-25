@@ -119,9 +119,12 @@ class WarningStderrReporter:
     help="Render components")
 @click.option("--outline-width", type=float, default=0.15,
     help="Outline width in mm")
+@click.option("--show-lib-paths", is_flag=True,
+    help="Show library paths and quit")
 def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
          mirror, highlight, filter, vcuts, dpi, margin, silent, werror,
-         resistor_values, resistor_flip, components, paste, outline_width):
+         resistor_values, resistor_flip, components, paste, outline_width,
+         show_lib_paths):
     """
     Create a stylized drawing of the PCB.
     """
@@ -142,6 +145,10 @@ def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
     plotter.render_back = side == "back"
     plotter.mirror = mirror
     plotter.margin = margin
+
+    if show_lib_paths:
+        print_lib_paths(plotter)
+        return 0
 
     plotter.plot_plan = [PlotSubstrate(
                             drill_holes=drill_holes,
@@ -195,6 +202,20 @@ def build_plot_components(remap, highlight, filter, resistor_flip, resistor_valu
             return ref in highlight
         plot_components.highlight = highlight_fun
     return plot_components
+
+def print_lib_paths(plotter: PcbPlotter) -> None:
+    plotter._build_libs_path()
+    print("The following paths are searched when looking for data files:")
+    for p in plotter.data_path:
+        print(f"- {p}")
+    print("")
+    print("Following libraries were selected: " + ", ".join(plotter.libs))
+    if len(plotter._libs_path) > 0:
+        print("Corresponding locations found:")
+        for p in plotter._libs_path:
+            print(f"- {p}")
+    else:
+        print("No paths for the libraries were found")
 
 
 @click.command()

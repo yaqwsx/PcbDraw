@@ -7,41 +7,18 @@ with images suitable for GitHub wiki.
 It allows you to write text, incrementally add new components to the board and
 highlight newly added components.
 
-## Installation
-
-This is currently part of PcbDraw, read the [PcbDraw](pcbdraw.md) installation.
-
-## Dependencies
-
-Dependencies are handled by PcbDraw installation.
 
 ## Usage
 
-Usage of Populate is simple, just run:
+Populate is invoked via `pcbdraw populate <specification> <output_directory>`.
+It takes the following options to override some of the parameters specified
+in the specification file:
 
-```.{bash}
-populate <source_file> <output_directory>
-```
-- `source_file` is a markdown source code with a yaml header defining the guide
-- `output_directory` is the directory for generated files. It will generate a
-  single `index.{md|html}` file and bunch of images (possible in a nested
-  directory).
+- `-b, --board FILE` override input board
+- `-t, --imgname TEXT` override image name template, should contain exactly one {}
+- `-t, --template TEXT` override handlebars template for HTML output
+- `-t, --type [md|html]` override output type: markdown or HTML
 
-Additionally you can pass following arguments:
-
-- `--params <parameters>` any command line parameters for PcbDraw (e.g. remap
-  file, style, etc.)
-- `--board <board>` KiCad board used for images
-- `--libs <libraries>` libraries for PcbDraw. Comma separated list of paths
-- `--type (md|html)` specify output format - HTML or markdown
-- `--img_name <template>` name for generated images. It should contain one
-  python formatting section. E.g. `img/pupulate_img_{}.svg`. Possible formats
-  are SVG and PNG.
-- `--template` handlebars file with a HTML web page template. Required only for
-  HTML output.
-
-All of these parameters are required, however you can specify them inside the
-source file. See the following section.
 
 ## Source file format
 
@@ -68,17 +45,13 @@ The source file can feature a header, where you can specify all the other option
 params:
     - --style mystyle.json
     - --remap remapping.json
-img_name: img/populating_{}.png
+imgname: img/populating_{}.png
 template: simple
 type: html
 board: ../ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
-libs: ../PcbDraw-Lib/KiCAD-base
+libs: KiCAD-6
 ...
 ```
-
-All the options are specified without leading `-- ` and use the full argument
-name. All paths except img_name are either absolute or relative to the source
-file.
 
 ## Handlebars template
 
