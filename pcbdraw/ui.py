@@ -4,7 +4,6 @@ from enum import IntEnum
 from typing import Tuple
 
 import click
-import wx
 
 from . import __version__
 from .convert import save
@@ -14,6 +13,7 @@ from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
 from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
                        renderBoard, validateExternalPrerequisites)
 from .populate import populate
+from .common import fakeKiCADGui
 
 
 class Layer(IntEnum):
@@ -126,8 +126,7 @@ def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
     Create a stylized drawing of the PCB.
     """
 
-    app = wx.App()
-    app.InitLocale()
+    app = fakeKiCADGui()
 
     plotter = PcbPlotter(input)
     plotter.setup_arbitrary_data_path(".")
@@ -227,8 +226,7 @@ def render(input, output, side, renderer, projection, no_components, transparent
     try:
         validateExternalPrerequisites()
 
-        app = wx.App()
-        app.InitLocale()
+        app = fakeKiCADGui()
 
         if bgcolor1[0] is None:
             bgcolor1 = None

@@ -21,6 +21,7 @@ from typing import List, Optional
 from itertools import chain
 
 from .plot import get_global_datapaths, find_data_file
+from .common import fakeKiCADGui
 
 PKG_BASE = os.path.dirname(__file__)
 
@@ -234,6 +235,9 @@ def populate(input, output, board, imgname, template, type):
     """
     Create assembly step-by-step guides
     """
+
+    app = fakeKiCADGui()
+
     data_path = get_data_path()
     try:
         header, content = load_content(input)
