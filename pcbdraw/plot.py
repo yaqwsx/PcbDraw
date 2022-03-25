@@ -237,8 +237,9 @@ def find_data_file(name: str, extension: str, data_paths: List[str], subdir: Opt
     for path in data_paths:
         if subdir is not None:
             fname = os.path.join(path, subdir, name)
-        else:
-            fname = os.path.join(path, name)
+            if os.path.isfile(fname):
+                return fname
+        fname = os.path.join(path, name)
         if os.path.isfile(fname):
             return fname
     return None
@@ -1061,8 +1062,8 @@ class PcbPlotter():
         """
         Add PcbDraw built-in libraries to the search path for libraries
         """
-        self.data_path.append(os.path.join(PKG_BASE, "footprints"))
-        self.data_path.append(os.path.join(PKG_BASE, "styles"))
+        self.data_path.append(os.path.join(PKG_BASE, "resources", "footprints"))
+        self.data_path.append(os.path.join(PKG_BASE))
 
     def setup_global_data_path(self):
         """
@@ -1087,14 +1088,14 @@ class PcbPlotter():
         """
         Given a name of style, find the corresponding file and load it
         """
-        path = self._find_data_file(name, ".json")
+        path = self._find_data_file(name, ".json", "styles")
         if path is None:
             raise RuntimeError(f"Cannot locate resource {name}; explored paths:\n"
                 + "\n".join([f"- {x}" for x in self.data_path]))
         self.style = load_style(name)
 
-    def _find_data_file(self, name: str, extension: str) -> Optional[str]:
-        return find_data_file(name, extension, self.data_path)
+    def _find_data_file(self, name: str, extension: str, subdir: str) -> Optional[str]:
+        return find_data_file(name, extension, self.data_path, subdir)
 
     def _build_libs_path(self) -> None:
         self._libs_path = []

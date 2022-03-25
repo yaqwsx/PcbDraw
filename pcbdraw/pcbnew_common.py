@@ -50,3 +50,19 @@ def combineBoundingBoxes(a, b):
     # height. See https://github.com/wxWidgets/wxWidgets/blob/e43895e5317a1e82e295788264553d9839190337/src/common/gdicmn.cpp#L94-L114
     # return wxRect(topLeft, bottomRight)
     return wxRect(x1, y1, x2 - x1, y2 - y1)
+
+def fakeKiCADGui():
+    """
+    KiCAD assumes wxApp and locale exists. If we invoke a command, fake the
+    existence of an app. You should store the application in a top-level
+    function of the command
+    """
+    import wx
+    import os
+
+    if os.name != "nt" and os.environ.get("DISPLAY", "").strip() == "":
+        return None
+
+    app = wx.App()
+    app.InitLocale()
+    return app

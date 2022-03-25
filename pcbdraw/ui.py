@@ -13,7 +13,7 @@ from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
 from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
                        renderBoard, validateExternalPrerequisites)
 from .populate import populate
-from .common import fakeKiCADGui
+from .pcbnew_common import fakeKiCADGui
 
 
 class Layer(IntEnum):

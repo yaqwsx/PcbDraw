@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
-import sys
-import os
-import click
-PKG_BASE = os.path.dirname(__file__)
-# Give more priority to local modules than installed versions
-sys.path.insert(0, os.path.dirname(os.path.abspath(PKG_BASE)))
-
-import mistune
-import pcbdraw.mdrenderer
-import re
 import codecs
+import os
+import re
+import shlex
+import sys
+from copy import deepcopy
+from itertools import chain
+from typing import List, Optional
+
+import click
+import mistune
 import pybars
 import yaml
-import argparse
-import subprocess
-import sysconfig
-import shlex
-from copy import deepcopy
-from typing import List, Optional
-from itertools import chain
 
-from .plot import get_global_datapaths, find_data_file
-from .common import fakeKiCADGui
+import pcbdraw.mdrenderer
+
+from .pcbnew_common import fakeKiCADGui
+from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
 
@@ -193,8 +188,9 @@ def generate_images(content, boardfilename, plot_args, name, outdir):
     return content
 
 def generate_image(boardfilename, side, components, active, plot_args, outputfile):
-    from .ui import plot
     from copy import deepcopy
+
+    from .ui import plot
 
     plot_args = deepcopy(plot_args)
 
@@ -212,7 +208,7 @@ def generate_image(boardfilename, side, components, active, plot_args, outputfil
 def get_data_path() -> List[str]:
     paths = []
     paths += filter(lambda x: len(x) > 0, os.environ.get("PCBDRAW_LIB_PATH", "").split(":"))
-    paths += [os.path.join(PKG_BASE, "templates")]
+    paths += [os.path.join(PKG_BASE, "resources", "templates")]
     paths += get_global_datapaths()
     return paths
 
