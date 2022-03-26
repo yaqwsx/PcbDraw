@@ -1088,11 +1088,11 @@ class PcbPlotter():
         """
         Given a name of style, find the corresponding file and load it
         """
-        path = self._find_data_file(name, ".json", "styles")
+        path = self._find_data_file(name, ".json", "resources/styles")
         if path is None:
             raise RuntimeError(f"Cannot locate resource {name}; explored paths:\n"
                 + "\n".join([f"- {x}" for x in self.data_path]))
-        self.style = load_style(name)
+        self.style = load_style(path)
 
     def _find_data_file(self, name: str, extension: str, subdir: str) -> Optional[str]:
         return find_data_file(name, extension, self.data_path, subdir)
