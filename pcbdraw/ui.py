@@ -183,7 +183,7 @@ def build_plot_components(remap, highlight, filter, resistor_flip, resistor_valu
         key, value = tuple(mapping.split(":"))
         resistor_values[key] = ResistorValue(value=value)
     for ref in resistor_flip:
-        field = resistor_values.get(key, ResistorValue())
+        field = resistor_values.get(ref, ResistorValue())
         field.flip_bands = True
         resistor_values[ref] = field
 

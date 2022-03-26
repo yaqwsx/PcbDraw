@@ -864,14 +864,14 @@ class PlotComponents:
         if root.find(f".//*[@id='{id_prefix}res_band1']") is None:
             return
         try:
-            res, tolerance = get_resistance_from_value(value)
+            res, tolerance = self._get_resistance_from_value(value)
             power = math.floor(res.log10()) - 1
             res = int(res / 10 ** power)
             resistor_colors = [
-                self._plotter._get_style("tht-resistor-band-colors", int(str(res)[0])),
-                self._plotter._get_style("tht-resistor-band-colors", int(str(res)[1])),
-                self._plotter._get_style("tht-resistor-band-colors", int(power)),
-                self._plotter._get_style("tht-resistor-band-colors", tolerance)
+                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
+                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
+                self._plotter.get_style("tht-resistor-band-colors", int(power)),
+                self._plotter.get_style("tht-resistor-band-colors", tolerance)
             ]
 
             if ref in self.resistor_values:
