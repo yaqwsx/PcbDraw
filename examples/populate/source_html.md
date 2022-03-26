@@ -5,7 +5,7 @@ params:
 imgname: img/populating_{}.png
 template: simple
 type: html
-board: ../ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
+board: ../resources/ArduinoLearningKitStarter.kicad_pcb
 ...
 
 # Demo population manual

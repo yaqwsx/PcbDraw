@@ -144,8 +144,7 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
 
     plotter.yield_warning = WarningStderrReporter(silent=silent)
 
-    if style is not None:
-        plotter.resolve_style(style)
+
     plotter.libs = libs
     plotter.render_back = side == "back"
     plotter.mirror = mirror
@@ -154,6 +153,9 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     if show_lib_paths:
         print_lib_paths(plotter)
         return 0
+
+    if style is not None:
+        plotter.resolve_style(style)
 
     plotter.plot_plan = [PlotSubstrate(
                             drill_holes=drill_holes,

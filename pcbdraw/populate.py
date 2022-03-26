@@ -262,14 +262,14 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
             if header is None:
                 raise KeyError("imgname")
             imgname = header["imgname"]
-        if template is None:
-            if header is None:
-                raise KeyError("template")
-            template = header["template"]
         if type is None:
             if header is None:
                 raise KeyError("type")
             type = header["type"]
+        if template is None and type == "html":
+            if header is None:
+                raise KeyError("template")
+            template = header["template"]
     except KeyError as e:
         sys.exit(f"Missing parameter {e} either in template file of source header")
 
@@ -277,12 +277,13 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         renderer = Renderer(mistune.Renderer) # type: ignore
         outputfile = "index.html"
         try:
+            assert template is not None
             template_file = find_data_file(template, '.handlebars', data_path)
             if template_file is None:
                 raise RuntimeError(f"Cannot find template '{template}'")
             template = read_template(template_file)
         except IOError:
-            sys.exit("Cannot open template file " + template)
+            sys.exit("Cannot open template file " + str(template))
     else:
         renderer = Renderer(pcbdraw.mdrenderer.MdRenderer) # type: ignore
         outputfile = "index.md"
@@ -292,6 +293,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
     parsed_content = generate_images(parsed_content, board, prepare_params(header["params"]),
                                      imgname, outputpath)
     if type == "html":
+        assert template is not None
         output_content = generate_html(template, parsed_content)
     else:
         output_content = generate_markdown(parsed_content)

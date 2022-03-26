@@ -504,7 +504,7 @@ def checkForExternalPrerequisites() -> List[str]:
     try:
         subprocess.run(["xdotool", "--help"], capture_output=True, check=True)
     except Exception as e:
-        missing.append("xdootool")
+        missing.append("xdotool")
     return missing
 
 

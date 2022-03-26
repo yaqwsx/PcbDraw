@@ -12,7 +12,6 @@ import tempfile
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable, Dict, List, Optional, Tuple, Union, Any
-from numbers import Number
 
 import engineering_notation # type: ignore
 import numpy as np
@@ -73,7 +72,7 @@ class SvgPathItem:
     def __init__(self, path: str) -> None:
         path = re.sub(r"([MLA])(-?\d+)", r"\1 \2", path)
         path_elems = re.split("[, ]", path)
-        path_elems = list(filter(lambda x: x, path))
+        path_elems = list(filter(lambda x: x, path_elems))
         if path_elems[0] != "M":
             raise SyntaxError("Only paths with absolute position are supported")
         self.start: Point = tuple(map(float, path_elems[1:3])) # type: ignore
@@ -205,7 +204,8 @@ def collect_transformation(element: etree.Element, root: Optional[etree.Element]
     if "transform" not in element.attrib:
         return m
     trans = element.attrib["transform"]
-    return np.matmul(m, to_trans_matrix(trans))
+    # There is a strange typing behavior in CI, ignore it at the moment
+    return np.matmul(m, to_trans_matrix(trans)) # type: ignore
 
 def element_position(element: etree.Element, root: Optional[etree.Element]=None) -> Point:
     position = matrix([
@@ -1075,8 +1075,7 @@ class PcbPlotter():
         """
         Add PcbDraw built-in libraries to the search path for libraries
         """
-        self.data_path.append(os.path.join(PKG_BASE, "resources", "footprints"))
-        self.data_path.append(os.path.join(PKG_BASE))
+        self.data_path.append(os.path.join(PKG_BASE, "resources"))
 
     def setup_global_data_path(self) -> None:
         """
@@ -1105,7 +1104,7 @@ class PcbPlotter():
         if path is None:
             raise RuntimeError(f"Cannot locate resource {name}; explored paths:\n"
                 + "\n".join([f"- {x}" for x in self.data_path]))
-        self.style = load_style(name)
+        self.style = load_style(path)
 
     def unique_prefix(self) -> str:
         pref = f"pref_{self._unique_counter}"
@@ -1119,6 +1118,8 @@ class PcbPlotter():
         self._libs_path = []
         for l in self.libs:
             self._libs_path += [os.path.join(p, l) for p in self.data_path]
+        for l in self.libs:
+            self._libs_path += [os.path.join(p, "footprints", l) for p in self.data_path]
         self._libs_path = [x for x in self._libs_path if os.path.exists(x)]
 
     def _get_model_file(self, lib: str, name: str) -> Optional[str]:

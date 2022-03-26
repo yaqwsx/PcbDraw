@@ -1,7 +1,5 @@
 # Examples
 
-To use any of the examples, simply run `./init.sh` in the examples directory.
-The script will download a simple demo board by RoboticsBrno.
 
 
 # Example usages of PcbDraw
@@ -11,43 +9,43 @@ All the examples assumes the current directory is the root of the repository.
 To render the board invoke:
 
 ```
-pcbdraw examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw plot examples/resources/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 To render board, but e.g. change colors of LEDs:
 
 ```
-pcbdraw --remap examples/pcbdraw/remap.json examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw plot --remap examples/resources/remap.json examples/resources/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 To render the back side:
 
 ```
-pcbdraw -b examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb back.svg
+pcbdraw plot --back examples/resources/ArduinoLearningKitStarter.kicad_pcb back.svg
 ```
 
 To use different style:
 
 ```
-pcbdraw --style oshpark-purple examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw plot --style oshpark-purple examples/resources/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 To render only the board without components:
 
 ```
-pcbdraw --filter "" examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw plot --filter "" examples/resources/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 To render board with only `L_R1` and `L_Y1`:
 
 ```
-pcbdraw --filter L_R1,L_Y1 examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw plot --filter L_R1,L_Y1 examples/resources/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 To render board and highlight `L_R1` and `L_Y1`:
 
 ```
-pcbdraw --highlight L_R1,L_Y1 examples/ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb front.svg
+pcbdraw plot --highlight L_R1,L_Y1 examples/resources/ArduinoLearningKitStarter.kicad_pcb front.svg
 ```
 
 
@@ -58,11 +56,11 @@ the same and are located in files `source_md.md` and `source_html.md`. To see
 the result, run
 
 ```
-populate examples/populate/source_md.md markdown_demo
+pcbraw populate examples/populate/source_md.md markdown_demo
 ```
 or
 ```
-populate examples/populate/source_html.md html_demo
+pcbdraw populate examples/populate/source_html.md html_demo
 ```
 
 You can find results

@@ -1,0 +1,30 @@
+name: test-kikit
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 3 * * *'
+jobs:
+  test:
+    name: "Run Pcbdraw tests"
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          sudo add-apt-repository --yes ppa:kicad/kicad-6.0-releases
+          sudo apt-get -qq install --yes --no-install-recommends \
+            kicad kicad-footprints kicad-symbols kicad-packages3d \
+            python3 python3-pip \
+            make git librsvg2-bin xvfb xdotool bats
+          sudo python3 -m pip install mypy
+          python3 -m pip install -e .\[dev\]
+      - run: make mypy
+      - run: make test
+      - run: make package
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: pcbdraw
+          path: dist
+          retention-days: 7
