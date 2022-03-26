@@ -1,6 +1,7 @@
 import subprocess
+from typing import List
 
-def isValidInkscape(executable):
+def isValidInkscape(executable: str) -> bool:
     try:
         out = subprocess.check_output([executable, "--version"]).decode("utf-8")
         parts = out.split(" ")
@@ -13,7 +14,7 @@ def isValidInkscape(executable):
     except subprocess.CalledProcessError as e:
         return False
 
-def chooseInkscapeCandidate(candidates):
+def chooseInkscapeCandidate(candidates: List[str]) -> str:
     for candidate in candidates:
         if isValidInkscape(candidate):
             return candidate

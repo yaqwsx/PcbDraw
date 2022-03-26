@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 import codecs
 import os
 import re
@@ -6,11 +7,11 @@ import shlex
 import sys
 from copy import deepcopy
 from itertools import chain
-from typing import List, Optional
+from typing import List, Optional, Any, Tuple, Dict
 
 import click
-import mistune
-import pybars
+import mistune # type: ignore
+import pybars # type: ignore
 import yaml
 
 import pcbdraw.mdrenderer
@@ -20,12 +21,12 @@ from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
 
-class PcbDrawInlineLexer(mistune.InlineLexer):
-    def __init__(self, renderer, rules=None, **kwargs):
+class PcbDrawInlineLexer(mistune.InlineLexer): # type: ignore
+    def __init__(self, renderer: Any, **kwargs: Any) -> None:
         super(PcbDrawInlineLexer, self).__init__(renderer, rules=None, **kwargs)
         self.enable_pcbdraw()
 
-    def enable_pcbdraw(self):
+    def enable_pcbdraw(self) -> None:
         self.rules.pcbdraw = re.compile(
             r"\[\["                   # [[
             r"([\s\S]+?\|[\s\S]+?)"   # side| component
@@ -33,23 +34,23 @@ class PcbDrawInlineLexer(mistune.InlineLexer):
         )
         self.default_rules.insert(3, "pcbdraw")
 
-    def output_pcbdraw(self, m):
+    def output_pcbdraw(self, m: re.Match[str]) -> Any:
         text = m.group(1)
         side, components = text.split("|")
         components = list(map(lambda x: x.strip(), components.split(",")))
         return self.renderer.pcbdraw(side, components)
 
-def Renderer(BaseRenderer):
-    class Tmp(BaseRenderer):
-        def __init__(self):
+def Renderer(BaseRenderer): # type: ignore
+    class Tmp(BaseRenderer): # type: ignore
+        def __init__(self) -> None:
             super(Tmp, self).__init__(escape=False)
-            self.items = []
-            self.current_item = None
-            self.active_side = "front"
-            self.visited_components = []
-            self.active_components = []
+            self.items: List[Dict[str, Any]]= []
+            self.current_item: Optional[Dict[str, Any]] = None
+            self.active_side: str = "front"
+            self.visited_components: List[str] = []
+            self.active_components: List[str] = []
 
-        def append_comment(self, html):
+        def append_comment(self, html: str) -> None:
             if self.current_item is not None and self.current_item["type"] == "steps":
                 self.items.append(self.current_item)
             if self.current_item is None or self.current_item["type"] == "steps":
@@ -60,7 +61,7 @@ def Renderer(BaseRenderer):
                 }
             self.current_item["content"] += html
 
-        def append_step(self, step):
+        def append_step(self, step: Dict[str, Any]) -> None:
             if self.current_item is not None and self.current_item["type"] == "comment":
                 self.items.append(self.current_item)
             if self.current_item is None or self.current_item["type"] == "comment":
@@ -71,46 +72,47 @@ def Renderer(BaseRenderer):
                 }
             self.current_item["steps"].append(step)
 
-        def output(self):
+        def output(self) -> List[Dict[str, Any]]:
             items = self.items
-            items.append(self.current_item)
+            if self.current_item is not None:
+                items.append(self.current_item)
             return items
 
-        def pcbdraw(self, side, components):
+        def pcbdraw(self, side: str, components: List[str]) -> str:
             self.active_side = side
             self.visited_components += components
             self.active_components = components
             return ""
 
-        def block_code(self, code, lang):
+        def block_code(self, code: str, lang: str) -> Any:
             retval = super(Tmp, self).block_code(code, lang)
             self.append_comment(retval)
             return retval
 
-        def block_quote(self, text):
+        def block_quote(self, text: str) -> Any:
             retval = super(Tmp, self).block_quote(text)
             self.append_comment(retval)
             return retval
 
-        def block_html(self, html):
+        def block_html(self, html: str) -> Any:
             retval = super(Tmp, self).block_html(html)
             self.append_comment(retval)
             return retval
 
-        def header(self, text, level, raw=None):
+        def header(self, text: str, level: int, raw: Optional[str]=None) -> Any:
             retval = super(Tmp, self).header(text, level, raw)
             self.append_comment(retval)
             return retval
 
-        def hrule(self):
+        def hrule(self) -> Any:
             retval = super(Tmp, self).hrule()
             self.append_comment(retval)
             return retval
 
-        def list(self, body, ordered=True):
+        def list(self, body: Any, ordered: bool=True) -> str:
             return ""
 
-        def list_item(self, text):
+        def list_item(self, text: str) -> str:
             step = {
                 "side": self.active_side,
                 "components": self.visited_components,
@@ -120,18 +122,18 @@ def Renderer(BaseRenderer):
             self.append_step(deepcopy(step))
             return ""
 
-        def paragraph(self, text):
+        def paragraph(self, text: str) -> Any:
             retval = super(Tmp, self).paragraph(text)
             self.append_comment(retval)
             return retval
 
-        def table(self, header, body):
+        def table(self, header: str, body: str) -> Any:
             retval = super(Tmp, self).table(header, body)
             self.append_comment(retval)
             return retval
     return Tmp()
 
-def load_content(filename):
+def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
     header = None
     with codecs.open(filename, encoding="utf-8") as f:
         content = f.read()
@@ -142,24 +144,24 @@ def load_content(filename):
                 content = content[end+3:]
     return header, content
 
-def parse_content(renderer, content):
+def parse_content(renderer: Any, content: str) -> List[Dict[str, Any]]:
     lexer = PcbDrawInlineLexer(renderer)
     processor = mistune.Markdown(renderer=renderer, inline=lexer)
     processor(content)
-    return renderer.output()
+    return renderer.output() # type: ignore
 
-def read_template(filename):
+def read_template(filename: str) -> str:
     with codecs.open(filename, encoding="utf-8") as f:
         return f.read()
 
-def generate_html(template, input):
-    input = {
+def generate_html(template: str, input: List[Dict[str, Any]]) -> bytes:
+    input_dict = {
         "items": input
     }
-    template = pybars.Compiler().compile(template)
-    return template(input).encode("utf-8")
+    template_fn = pybars.Compiler().compile(template)
+    return template_fn(input_dict).encode("utf-8") # type: ignore
 
-def generate_markdown(input):
+def generate_markdown(input: List[Dict[str, Any]]) -> bytes:
     output = ""
     for item in input:
         if item["type"] == "comment":
@@ -171,7 +173,8 @@ def generate_markdown(input):
     return output.encode("utf-8")
 
 
-def generate_images(content, boardfilename, plot_args, name, outdir):
+def generate_images(content: List[Dict[str, Any]], boardfilename: str,
+                    plot_args: List[str], name: str, outdir: str) -> List[Dict[str, Any]]:
     dir = os.path.dirname(os.path.join(outdir, name))
     if not os.path.exists(dir):
         os.makedirs(dir)
@@ -187,7 +190,8 @@ def generate_images(content, boardfilename, plot_args, name, outdir):
             x["img"] = filename
     return content
 
-def generate_image(boardfilename, side, components, active, plot_args, outputfile):
+def generate_image(boardfilename: str, side: str, components: List[str],
+                   active: List[str], plot_args: List[str], outputfile: str) -> None:
     from copy import deepcopy
 
     from .ui import plot
@@ -206,15 +210,15 @@ def generate_image(boardfilename, side, components, active, plot_args, outputfil
             raise e from None
 
 def get_data_path() -> List[str]:
-    paths = []
+    paths: List[str] = []
     paths += filter(lambda x: len(x) > 0, os.environ.get("PCBDRAW_LIB_PATH", "").split(":"))
     paths += [os.path.join(PKG_BASE, "resources", "templates")]
     paths += get_global_datapaths()
     return paths
 
 def prepare_params(params: List[str]) -> List[str]:
-    params = [shlex.split(x) for x in params]
-    return list(chain(*params))
+    p = [shlex.split(x) for x in params]
+    return list(chain(*p))
 
 @click.command()
 @click.argument("input", type=click.Path(exists=True, file_okay=True, dir_okay=False))
@@ -227,7 +231,8 @@ def prepare_params(params: List[str]) -> List[str]:
     help="override handlebars template for HTML output")
 @click.option("--type", "-t", type=click.Choice(["md", "html"]), default=None,
     help="override output type: markdown or HTML")
-def populate(input, output, board, imgname, template, type):
+def populate(input: str, output: str, board: Optional[str], imgname: Optional[str],
+             template: Optional[str], type: Optional[str]) -> None:
     """
     Create assembly step-by-step guides
     """
@@ -250,36 +255,49 @@ def populate(input, output, board, imgname, template, type):
     # If no overriding is specified, load it from the template
     try:
         if board is None:
+            if header is None:
+                raise KeyError("board")
             board = header["board"]
         if imgname is None:
+            if header is None:
+                raise KeyError("imgname")
             imgname = header["imgname"]
         if template is None:
+            if header is None:
+                raise KeyError("template")
             template = header["template"]
         if type is None:
+            if header is None:
+                raise KeyError("type")
             type = header["type"]
     except KeyError as e:
         sys.exit(f"Missing parameter {e} either in template file of source header")
 
     if type == "html":
-        renderer = Renderer(mistune.Renderer)
+        renderer = Renderer(mistune.Renderer) # type: ignore
         outputfile = "index.html"
         try:
-            template = read_template(find_data_file(template, '.handlebars', data_path))
+            template_file = find_data_file(template, '.handlebars', data_path)
+            if template_file is None:
+                raise RuntimeError(f"Cannot find template '{template}'")
+            template = read_template(template_file)
         except IOError:
             sys.exit("Cannot open template file " + template)
     else:
-        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer)
+        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer) # type: ignore
         outputfile = "index.md"
-    content = parse_content(renderer, content)
-    content = generate_images(content, board, prepare_params(header["params"]),
-                              imgname, output)
+    parsed_content = parse_content(renderer, content)
+    if header is None:
+        raise RuntimeError("Parameters were not specified in the template")
+    parsed_content = generate_images(parsed_content, board, prepare_params(header["params"]),
+                                     imgname, outputpath)
     if type == "html":
-        output = generate_html(template, content)
+        output_content = generate_html(template, parsed_content)
     else:
-        output = generate_markdown(content)
+        output_content = generate_markdown(parsed_content)
 
     with open(os.path.join(outputpath, outputfile), "wb") as f:
-        f.write(output)
+        f.write(output_content)
 
 if __name__ == '__main__':
     populate()

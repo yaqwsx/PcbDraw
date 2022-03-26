@@ -11,13 +11,22 @@ import sysconfig
 import tempfile
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union, Any
+from numbers import Number
 
-import engineering_notation
+import engineering_notation # type: ignore
 import numpy as np
-import svgpathtools
-from lxml import etree, objectify
-from pcbnewTransition import KICAD_VERSION, isV6, pcbnew
+import numpy.typing
+import svgpathtools # type: ignore
+from lxml import etree, objectify # type: ignore
+from pcbnewTransition import KICAD_VERSION, isV6, pcbnew # type: ignore
+
+# Type
+Numeric = Union[int, float]
+Point = Tuple[Numeric, Numeric]
+Matrix = np.typing.NDArray[np.float32]
+Box = Tuple[Numeric, Numeric, Numeric, Numeric]
+
 
 PKG_BASE = os.path.dirname(__file__)
 
@@ -61,35 +70,37 @@ default_style = {
 float_re = r'([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)'
 
 class SvgPathItem:
-    def __init__(self, path):
+    def __init__(self, path: str) -> None:
         path = re.sub(r"([MLA])(-?\d+)", r"\1 \2", path)
-        path = re.split("[, ]", path)
-        path = list(filter(lambda x: x, path))
-        if path[0] != "M":
+        path_elems = re.split("[, ]", path)
+        path_elems = list(filter(lambda x: x, path))
+        if path_elems[0] != "M":
             raise SyntaxError("Only paths with absolute position are supported")
-        self.start = tuple(map(float, path[1:3]))
-        path = path[3:]
-        if path[0] == "L":
-            x = float(path[1])
-            y = float(path[2])
+        self.start: Point = tuple(map(float, path_elems[1:3])) # type: ignore
+        self.end: Point = (0, 0)
+        self.args: Optional[List[Numeric]] = None
+        path_elems = path_elems[3:]
+        if path_elems[0] == "L":
+            x = float(path_elems[1])
+            y = float(path_elems[2])
             self.end = (x, y)
-            self.type = path[0]
+            self.type = path_elems[0]
             self.args = None
-        elif path[0] == "A":
-            args = list(map(float, path[1:8]))
+        elif path_elems[0] == "A":
+            args = list(map(float, path_elems[1:8]))
             self.end = (args[5], args[6])
             self.args = args[0:5]
-            self.type = path[0]
+            self.type = path_elems[0]
         else:
-            raise SyntaxError("Unsupported path element " + path[0])
+            raise SyntaxError("Unsupported path element " + path_elems[0])
 
     @staticmethod
-    def is_same(p1, p2):
+    def is_same(p1: Point, p2: Point) -> bool:
         dx = p1[0] - p2[0]
         dy = p1[1] - p2[1]
         return math.sqrt(dx*dx+dy*dy) < 5
 
-    def format(self, first):
+    def format(self, first: bool) -> str:
         ret = ""
         if first:
             ret += " M {} {} ".format(*self.start)
@@ -99,20 +110,16 @@ class SvgPathItem:
         ret += " {} {} ".format(*self.end)
         return ret
 
-    def flip(self):
+    def flip(self) -> None:
         self.start, self.end = self.end, self.start
         if self.type == "A":
+            assert(self.args is not None)
             self.args[4] = 1 if self.args[4] < 0.5 else 0
 
-def unique_prefix():
-    unique_prefix.counter += 1
-    return "pref_" + str(unique_prefix.counter)
-unique_prefix.counter = 0
-
-def matrix(data):
+def matrix(data: List[List[Numeric]]) -> Matrix:
     return np.array(data, dtype=np.float32)
 
-def extract_arg(args, index, default=None):
+def extract_arg(args: List[Any], index: int, default: Any=None) -> Any:
     """
     Return n-th element of array or default if out of range
     """
@@ -120,7 +127,7 @@ def extract_arg(args, index, default=None):
         return default
     return args[index]
 
-def to_trans_matrix(transform):
+def to_trans_matrix(transform: str) -> Matrix:
     """
     Given SVG transformation string returns corresponding matrix
     """
@@ -151,8 +158,8 @@ def to_trans_matrix(transform):
                 [0, y, 0],
                 [0, 0, 1]]))
         if op == 'rotate':
-            cosa = np.cos(np.radians(args[0]))
-            sina = np.sin(np.radians(args[0]))
+            cosa: float = math.cos(math.radians(args[0]))
+            sina: float = math.sin(math.radians(args[0]))
             if len(args) != 1:
                 x, y = args[1:3]
                 m = np.matmul(m, matrix([
@@ -168,21 +175,20 @@ def to_trans_matrix(transform):
                     [1, 0, -x],
                     [0, 1, -y],
                     [0, 0, 1]]))
+        tana: float = math.tan(math.radians(args[0]))
         if op == 'skewX':
-            tana = np.tan(np.radians(args[0]))
             m = np.matmul(m, matrix([
                 [1, tana, 0],
                 [0, 1, 0],
                 [0, 0, 1]]))
         if op == 'skewY':
-            tana = np.tan(np.radians(args[0]))
             m = np.matmul(m, matrix([
                 [1, 0, 0],
                 [tana, 1, 0],
                 [0, 0, 1]]))
     return m
 
-def collect_transformation(element, root=None):
+def collect_transformation(element: etree.Element, root: Optional[etree.Element]=None) -> Matrix:
     """
     Collect all the transformation applied to an element and return it as matrix
     """
@@ -201,7 +207,7 @@ def collect_transformation(element, root=None):
     trans = element.attrib["transform"]
     return np.matmul(m, to_trans_matrix(trans))
 
-def element_position(element, root=None):
+def element_position(element: etree.Element, root: Optional[etree.Element]=None) -> Point:
     position = matrix([
         [element.attrib["x"]],
         [element.attrib["y"]],
@@ -244,23 +250,23 @@ def find_data_file(name: str, extension: str, data_paths: List[str], subdir: Opt
             return fname
     return None
 
-def ki2dmil(val):
+def ki2dmil(val: int) -> float:
     return val // 2540
 
-def dmil2ki(val):
-    return val * 2540
+def dmil2ki(val: float) -> int:
+    return int(val * 2540)
 
-def ki2mm(val):
+def ki2mm(val: int) -> float:
     return val / 1000000.0
 
-def mm2ki(val):
+def mm2ki(val: float) -> int:
     return int(val * 1000000)
 
 # KiCAD 5 and KiCAD 6 use different units of the SVG
-ki2svg = (lambda x: int(x)) if isV6(KICAD_VERSION) else ki2dmil
-svg2ki = (lambda x: int(x)) if isV6(KICAD_VERSION) else dmil2ki
+ki2svg: Callable[[int], float] = (lambda x: int(x)) if isV6(KICAD_VERSION) else ki2dmil
+svg2ki: Callable[[float], int] = (lambda x: int(x)) if isV6(KICAD_VERSION) else dmil2ki
 
-def to_kicad_basic_units(val):
+def to_kicad_basic_units(val: str) -> int:
     """
     Read string value and return it as KiCAD base units
     """
@@ -279,11 +285,12 @@ def to_kicad_basic_units(val):
         return mm2ki(value * 10)
     if unit == "in":
         return mm2ki(25.4 * value)
+    raise RuntimeError(f"Unknown units in '{val}'")
 
-def to_user_units(val):
+def to_user_units(val: str) -> float:
     x = float_re + r'\s*(pt|pc|mm|cm|in)?'
-    value, unit = re.findall(x, val)[0]
-    value = float(value)
+    value_str, unit = re.findall(x, val)[0]
+    value = float(value_str)
     if unit == "" or unit == "px":
         return value
     if unit == "pt":
@@ -296,8 +303,10 @@ def to_user_units(val):
         return 35.43307 * value
     if unit == "in":
         return 90
+    raise RuntimeError(f"Unknown units in '{val}'")
 
-def make_XML_identifier(s):
+
+def make_XML_identifier(s: str) -> str:
     """
     Given a name, strip invalid characters from XML identifier
     """
@@ -305,27 +314,11 @@ def make_XML_identifier(s):
     s = re.sub('^[^a-zA-Z_]+', '', s)
     return s
 
-def extract_resistor_settings(args):
-    tht_resistor_settings = {}
-    if args.resistor_values:
-        split_list = args.resistor_values.split(",")
-        for r in split_list:
-            r_s = r.split(":")
-            tht_resistor_settings[r_s[0]] = {'override_val': r_s[1]}
-    if args.resistor_flip:
-        for r in args.resistor_flip.split(","):
-            if r in tht_resistor_settings:
-                tht_resistor_settings[r]['flip'] = True
-            else:
-                tht_resistor_settings[r] = {'flip': True}
-    return tht_resistor_settings
-
-def read_svg_unique(filename: str) -> etree.Element:
-    root, _ = read_svg_unique2(filename)
+def read_svg_unique(filename: str, prefix: str) -> etree.Element:
+    root, _ = read_svg_unique2(filename, prefix)
     return root
 
-def read_svg_unique2(filename: str) -> etree.Element:
-    prefix = unique_prefix() + "_"
+def read_svg_unique2(filename: str, prefix: str) -> etree.Element:
     root = etree.parse(filename).getroot()
     # We have to ensure all Ids in SVG are unique. Let's make it nasty by
     # collecting all ids and doing search & replace
@@ -344,14 +337,14 @@ def read_svg_unique2(filename: str) -> etree.Element:
             el.attrib["id"] = prefix + el.attrib["id"]
     return root, prefix
 
-def extract_svg_content(root):
+def extract_svg_content(root: etree.Element) -> List[etree.Element]:
     # Remove SVG namespace to ease our lives and change ids
     for el in root.getiterator():
         if '}' in str(el.tag):
             el.tag = el.tag.split('}', 1)[1]
     return [ x for x in root if x.tag and x.tag not in ["title", "desc"]]
 
-def strip_style_svg(root, keys, forbidden_colors):
+def strip_style_svg(root: etree.Element, keys: List[str], forbidden_colors: List[str]) -> bool:
     elements_to_remove = []
     for el in root.getiterator():
         if "style" in el.attrib:
@@ -376,7 +369,7 @@ def strip_style_svg(root, keys, forbidden_colors):
         el.getparent().remove(el)
     return root in elements_to_remove
 
-def empty_svg(**attrs):
+def empty_svg(**attrs: str) -> etree.ElementTree:
     document = etree.ElementTree(etree.fromstring(
         """<?xml version="1.0" standalone="no"?>
         <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
@@ -391,7 +384,7 @@ def empty_svg(**attrs):
         root.attrib[key] = value
     return document
 
-def get_board_polygon(svg_elements):
+def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
     """
     Try to connect independents segments on Edge.Cuts and form a polygon
     return SVG path element with the polygon
@@ -439,18 +432,20 @@ def get_board_polygon(svg_elements):
     e = etree.Element("path", d=path, style="fill-rule: evenodd;")
     return e
 
-def component_to_board_scale(svg):
+def component_to_board_scale(svg: etree.Element) -> Tuple[float, float]:
     width = ki2svg(to_kicad_basic_units(svg.attrib["width"]))
     height = ki2svg(to_kicad_basic_units(svg.attrib["height"]))
     x, y, vw, vh = [float(x) for x in svg.attrib["viewBox"].split()]
     return width / vw, height / vh
 
-def load_style(style_file):
+def load_style(style_file: str) -> Dict[str, Any]:
     try:
         with open(style_file, "r") as f:
             style = json.load(f)
     except IOError:
         raise RuntimeError("Cannot open style " + style_file)
+    if not isinstance(style, dict):
+        raise RuntimeError("Stylesheet has to be a dictionary")
     required = set(["copper", "board", "clad", "silk", "pads", "outline",
         "vcut", "highlight-style", "highlight-offset", "highlight-on-top",
         "highlight-padding"])
@@ -460,26 +455,33 @@ def load_style(style_file):
                                 .format(style_file, ", ".join(missing)))
     return style
 
-def load_remapping(remap_file):
+def load_remapping(remap_file: str) -> Dict[str, Tuple[str, str]]:
+    def readMapping(s: str) -> Tuple[str, str]:
+        x = s.split(":")
+        if len(x) != 2:
+            raise RuntimeError(f"Invalid remmaping value {s}")
+        return x[0], x[1]
     if remap_file is None:
         return {}
     try:
         with open(remap_file, "r") as f:
-            f = json.load(f)
-            return {ref: tuple(val.split(":")) for ref, val in f.items()}
+            j = json.load(f)
+            if not isinstance(j, dict):
+                raise RuntimeError("Invalid format of remapping file")
+            return {ref: readMapping(val) for ref, val in j.items()}
     except IOError:
         raise RuntimeError("Cannot open remapping file " + remap_file)
 
-def merge_bbox(left, right):
+def merge_bbox(left: Box, right: Box) -> Box:
     """
     Merge bounding boxes in format (xmin, xmax, ymin, ymax)
     """
     return tuple([
         f(l, r) for l, r, f in zip(left, right, [min, max, min, max])
-    ])
+    ]) # type: ignore
 
 
-def shrink_svg(svg: etree.ElementTree, margin: float):
+def shrink_svg(svg: etree.ElementTree, margin: int) -> None:
     """
     Shrink the SVG canvas to the size of the drawing. Add margin in
     KiCAD units.
@@ -488,7 +490,7 @@ def shrink_svg(svg: etree.ElementTree, margin: float):
     # PcbDraw and svgpathtools
     from xml.etree.ElementTree import fromstring as xmlParse
 
-    from lxml.etree import tostring as serializeXml
+    from lxml.etree import tostring as serializeXml # type: ignore
     paths = svgpathtools.document.flattened_paths(xmlParse(serializeXml(svg)))
 
     if len(paths) == 0:
@@ -510,7 +512,7 @@ def shrink_svg(svg: etree.ElementTree, margin: float):
     root.attrib["width"] = str(ki2mm(svg2ki(bbox[1] - bbox[0]))) + "mm"
     root.attrib["height"] = str(ki2mm(svg2ki(bbox[3] - bbox[2]))) + "mm"
 
-def remove_empty_elems(tree):
+def remove_empty_elems(tree: etree.Element) -> None:
     """
     Given SVG tree, remove empty groups and defs
     """
@@ -523,7 +525,7 @@ def remove_empty_elems(tree):
     for elem in toDel:
         tree.remove(elem)
 
-def remove_inkscape_annotation(tree):
+def remove_inkscape_annotation(tree: etree.Element) -> None:
     for elem in tree:
         remove_inkscape_annotation(elem)
     for key in tree.attrib.keys():
@@ -596,12 +598,17 @@ def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
     return holes
 
 
+class PlotInterface:
+    def render(self, plotter: PcbPlotter) -> None:
+        raise NotImplementedError("Plot interface wasn't implemented")
+
+
 @dataclass
-class PlotSubstrate:
+class PlotSubstrate(PlotInterface):
     drill_holes: bool = True
     outline_width: int = mm2ki(0.1)
 
-    def render(self, plotter: PcbPlotter):
+    def render(self, plotter: PcbPlotter) -> None:
         self._plotter = plotter # ...so we don't have to pass it explicitly
 
         to_plot: List[PlotAction] = []
@@ -643,7 +650,7 @@ class PlotSubstrate:
             layer.attrib["mask"] = "url(#pads-mask)"
         if name == "silk":
             layer.attrib["mask"] = "url(#pads-mask-silkscreen)"
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
             if not strip_style_svg(element, keys=["fill", "stroke"],
@@ -661,7 +668,7 @@ class PlotSubstrate:
             layer.attrib["mask"] = "url(#pads-mask)"
         if name == "silk":
             layer.attrib["mask"] = "url(#pads-mask-silkscreen)"
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
             if not strip_style_svg(element, keys=["fill", "stroke", "stroke-width"],
@@ -682,15 +689,15 @@ class PlotSubstrate:
         clipPath.append(
             get_board_polygon(
                 extract_svg_content(
-                    read_svg_unique(source_filename))))
+                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
 
         layer = etree.SubElement(self._container, "g", id="substrate-"+name,
             style="fill:{0}; stroke:{0};".format(self._plotter.get_style(name)))
         layer.append(
             get_board_polygon(
                 extract_svg_content(
-                    read_svg_unique(source_filename))))
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
             if not strip_style_svg(element, keys=["fill", "stroke"],
@@ -699,7 +706,7 @@ class PlotSubstrate:
 
     def _process_mask(self, name: str, source_filename: str) -> None:
         mask = self._plotter.get_def_slot(tag_name="mask", id=name)
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             for item in element.getiterator():
                 if "style" in item.attrib:
                     # KiCAD plots in black, for mask we need white
@@ -713,7 +720,7 @@ class PlotSubstrate:
             "height": str(ki2svg(self._boardsize.GetHeight())),
             "fill": "white"
         })
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # KiCAD plots black, no need to change fill
             silkMask.append(element)
 
@@ -756,7 +763,7 @@ class PlacedComponentInfo:
     size: Tuple[float, float]
 
 @dataclass
-class PlotComponents:
+class PlotComponents(PlotInterface):
     filter: Callable[[str], bool] = lambda x: True # Components to show
     highlight: Callable[[str], bool] = lambda x: False # References to highlight
     remapping: Callable[[str, str, str], Tuple[str, str]] = lambda ref, lib, name: (lib, name)
@@ -764,12 +771,12 @@ class PlotComponents:
 
     def render(self, plotter: PcbPlotter) -> None:
         self._plotter = plotter
-        self._prefix = unique_prefix()
+        self._prefix = plotter.unique_prefix()
         self._used_components: Dict[str, PlacedComponentInfo] = {}
         plotter.walk_components(invert_side=False, callback=self._append_component)
         plotter.walk_components(invert_side=True, callback=self._append_back_component)
 
-    def _get_unique_name(self, lib, name, value):
+    def _get_unique_name(self, lib: str, name: str, value: str) -> str:
         return f"{self._prefix}_{lib}__{name}_{value}"
 
     def _append_back_component(self, lib: str, name: str, ref: str, value: str,
@@ -781,8 +788,10 @@ class PlotComponents:
         if not self.filter(ref) or name == "":
             return
         # Override resistor values
-        if ref in self.resistor_values and self.resistor_values[ref].value is not None:
-            value = self.resistor_values[ref].value
+        if ref in self.resistor_values:
+            v = self.resistor_values[ref].value
+            if v is not None:
+                value = v
 
         lib, name = self.remapping(ref, lib, name)
 
@@ -821,19 +830,19 @@ class PlotComponents:
         xml_id = make_XML_identifier(self._get_unique_name(lib, name, value))
         component_element = etree.Element("g", attrib={"id": xml_id})
 
-        svg_tree, id_prefix = read_svg_unique2(f)
+        svg_tree, id_prefix = read_svg_unique2(f, self._plotter.unique_prefix())
         for x in extract_svg_content(svg_tree):
             if x.tag in ["namedview", "metadata"]:
                 continue
             component_element.append(x)
-        origin_x = 0
-        origin_y = 0
+        origin_x: Numeric = 0
+        origin_y: Numeric = 0
         origin = component_element.find(".//*[@id='origin']")
         if origin is not None:
             origin_x, origin_y = element_position(origin, root=component_element)
             origin.getparent().remove(origin)
         else:
-            self._plotter.yield_warning(f"component: Component {lib}:{name} has not origin")
+            self._plotter.yield_warning("origin", f"component: Component {lib}:{name} has not origin")
         svg_scale_x, svg_scale_y = component_to_board_scale(svg_tree)
         component_info = PlacedComponentInfo(
             id=xml_id,
@@ -848,10 +857,10 @@ class PlotComponents:
                          position: Tuple[int, int, float]) -> None:
         padding = mm2ki(self._plotter.get_style("highlight-padding"))
         h = etree.Element("rect", id=f"h_{ref}",
-            x=str(ki2svg(-padding / info.scale[0])),
-            y=str(ki2svg(-padding /  info.scale[1])),
-            width=str(ki2svg(info.size[0] + 2 * padding) / info.scale[0]),
-            height=str(ki2svg(info.size[1] + 2 * padding) / info.scale[1]),
+            x=str(ki2svg(int(-padding / info.scale[0]))),
+            y=str(ki2svg(int(-padding /  info.scale[1]))),
+            width=str(ki2svg(int(info.size[0] + 2 * padding)) / info.scale[0]),
+            height=str(ki2svg(int(info.size[1] + 2 * padding)) / info.scale[1]),
             style=self._plotter.get_style("highlight-style"))
         h.attrib["transform"] = \
             f"translate({ki2svg(position[0])} {ki2svg(position[1])}) " + \
@@ -864,14 +873,14 @@ class PlotComponents:
         if root.find(f".//*[@id='{id_prefix}res_band1']") is None:
             return
         try:
-            res, tolerance = get_resistance_from_value(value)
+            res, tolerance = self._get_resistance_from_value(value)
             power = math.floor(res.log10()) - 1
-            res = int(res / 10 ** power)
+            res = Decimal(int(res / 10 ** power))
             resistor_colors = [
-                self._plotter._get_style("tht-resistor-band-colors", int(str(res)[0])),
-                self._plotter._get_style("tht-resistor-band-colors", int(str(res)[1])),
-                self._plotter._get_style("tht-resistor-band-colors", int(power)),
-                self._plotter._get_style("tht-resistor-band-colors", tolerance)
+                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
+                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
+                self._plotter.get_style("tht-resistor-band-colors", int(power)),
+                self._plotter.get_style("tht-resistor-band-colors", tolerance)
             ]
 
             if ref in self.resistor_values:
@@ -898,13 +907,16 @@ class PlotComponents:
     def _get_resistance_from_value(self, value: str) -> Tuple[Decimal, str]:
         res, tolerance = None, "5%"
         try:
-            value = value.split(" ", maxsplit=1)
-            res = engineering_notation.EngNumber(value[0]).number
-            if len(value) > 1:
-                t_string = value[1].strip().replace(" ", "")
+            value_l = value.split(" ", maxsplit=1)
+            res = engineering_notation.EngNumber(value_l[0]).number
+            if len(value_l) > 1:
+                t_string = value_l[1].strip().replace(" ", "")
                 if "%" in t_string:
-                    if t_string.strip() in self._plotter.get_style("tht-resistor-band-colors"):
-                        raise UserWarning(f"Invalid resistor tolerance {value[1]}")
+                    s = self._plotter.get_style("tht-resistor-band-colors")
+                    if not isinstance(s, dict):
+                        raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
+                    if t_string.strip() not in s:
+                        raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
                     tolerance = t_string
         except decimal.InvalidOperation:
             raise UserWarning(f"Invalid value {value}") from None
@@ -912,7 +924,7 @@ class PlotComponents:
 
 
 @dataclass
-class PlotPlaceholders:
+class PlotPlaceholders(PlotInterface):
     def render(self, plotter: PcbPlotter) -> None:
         self._plotter = plotter
         plotter.walk_components(invert_side=False, callback=self._append_placeholder)
@@ -926,10 +938,10 @@ class PlotPlaceholders:
         self._plotter.append_component_element(p)
 
 @dataclass
-class PlotVCuts:
+class PlotVCuts(PlotInterface):
     layer: int = pcbnew.Cmts_User
 
-    def render(self, plotter: PcbPlotter):
+    def render(self, plotter: PcbPlotter) -> None:
         self._plotter = plotter
         self._plotter.execute_plot_plan([
             PlotAction("vcuts", [self.layer], self._process_vcuts)
@@ -938,7 +950,7 @@ class PlotVCuts:
     def _process_vcuts(self, name: str, source_filename: str) -> None:
         layer = etree.Element("g", id="substrate-vcuts",
             style="fill:{0}; stroke:{0};".format(self._plotter.get_style("vcut")))
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
             if not strip_style_svg(element, keys=["fill", "stroke"],
@@ -947,8 +959,8 @@ class PlotVCuts:
         self._plotter.append_board_element(layer)
 
 @dataclass
-class PlotPaste:
-    def render(self, plotter: PcbPlotter):
+class PlotPaste(PlotInterface):
+    def render(self, plotter: PcbPlotter) -> None:
         plan: List[PlotAction] = []
         if plotter.render_back:
             plan = [PlotAction("paste", [pcbnew.B_Paste], self._process_paste)]
@@ -960,7 +972,7 @@ class PlotPaste:
     def _process_paste(self, name: str, source_filename: str) -> None:
         layer = etree.Element("g", id="substrate-paste",
             style="fill:{0}; stroke:{0};".format(self._plotter.get_style("paste")))
-        for element in extract_svg_content(read_svg_unique(source_filename)):
+        for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             if not strip_style_svg(element, keys=["fill", "stroke"],
                                    forbidden_colors=["#ffffff"]):
                 layer.append(element)
@@ -974,13 +986,14 @@ class PcbPlotter():
     avoid passing many arguments between auxiliary functions
     """
     def __init__(self, boardFile: str):
+        self._unique_counter: int = 1
         try:
-            self.board = pcbnew.LoadBoard(boardFile)
+            self.board: pcbnew.BOARD = pcbnew.LoadBoard(boardFile)
         except IOError:
             raise IOError(f"Cannot open board '{boardFile}'") from None
-        self.render_back = False
-        self.mirror = False
-        self.plot_plan = [
+        self.render_back: bool = False
+        self.mirror: bool = False
+        self.plot_plan: List[PlotInterface] = [
             PlotSubstrate(),
             PlotComponents(),
         ]
@@ -988,8 +1001,8 @@ class PcbPlotter():
         self.data_path: List[str] = [] # Base paths for libraries lookup
         self.libs: List[str] = [] # Names of available libraries
         self._libs_path: List[str] = []
-        self.style: any = {}     # Color scheme
-        self.margin: float = 0 # Margin of the resulting document
+        self.style: Any = {}     # Color scheme
+        self.margin: int = 0 # Margin of the resulting document
 
         self.yield_warning: Callable[[str, str], None] = lambda tag, msg: None # Handle warnings
 
@@ -1058,14 +1071,14 @@ class PcbPlotter():
         """
         self._high_cont.append(element)
 
-    def setup_builtin_data_path(self):
+    def setup_builtin_data_path(self) -> None:
         """
         Add PcbDraw built-in libraries to the search path for libraries
         """
         self.data_path.append(os.path.join(PKG_BASE, "resources", "footprints"))
         self.data_path.append(os.path.join(PKG_BASE))
 
-    def setup_global_data_path(self):
+    def setup_global_data_path(self) -> None:
         """
         Add global installation paths to the search path for libraries.
         """
@@ -1094,6 +1107,11 @@ class PcbPlotter():
                 + "\n".join([f"- {x}" for x in self.data_path]))
         self.style = load_style(name)
 
+    def unique_prefix(self) -> str:
+        pref = f"pref_{self._unique_counter}"
+        self._unique_counter += 1
+        return pref
+
     def _find_data_file(self, name: str, extension: str, subdir: str) -> Optional[str]:
         return find_data_file(name, extension, self.data_path, subdir)
 
@@ -1103,7 +1121,7 @@ class PcbPlotter():
             self._libs_path += [os.path.join(p, l) for p in self.data_path]
         self._libs_path = [x for x in self._libs_path if os.path.exists(x)]
 
-    def _get_model_file(self, lib, name) -> Optional[str]:
+    def _get_model_file(self, lib: str, name: str) -> Optional[str]:
         """
         Find model file in the configured libraries. If it doesn't exists,
         return None.
@@ -1112,8 +1130,9 @@ class PcbPlotter():
             f = os.path.join(path, lib, name + ".svg")
             if os.path.isfile(f):
                 return f
+        return None
 
-    def get_style(self, *args: List[str]) -> any:
+    def get_style(self, *args: Union[str, int]) -> Any:
         try:
             value = self.style
             for key in args:

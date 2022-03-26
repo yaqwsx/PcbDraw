@@ -1,9 +1,10 @@
 import sys
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Tuple
+from typing import Tuple, Optional, Any, List
 
 import click
+from PIL import Image
 
 from . import __version__
 from .convert import save
@@ -41,7 +42,8 @@ class Layer(IntEnum):
 class KiCADLayer(click.ParamType):
     name = "KiCAD layer"
 
-    def convert(self, value, param, ctx):
+    def convert(self, value: Any, param: Optional[click.Parameter],
+                ctx: Optional[click.Context]) -> Layer:
         if isinstance(value, int):
             if value in [item.value for item in Layer]:
                 return Layer(value)
@@ -56,7 +58,8 @@ class KiCADLayer(click.ParamType):
 class CommaList(click.ParamType):
     name = "Comma separated list"
 
-    def convert(self, value, param, ctx):
+    def convert(self, value: Any, param: Optional[click.Parameter],
+                ctx: Optional[click.Context]) -> List[str]:
         if isinstance(value, list):
             return value
         if not isinstance(value, str):
@@ -68,7 +71,7 @@ class CommaList(click.ParamType):
 class WarningStderrReporter:
     silent: bool
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.triggered = False
 
     def __call__(self, tag: str, msg: str) -> None:
@@ -121,10 +124,12 @@ class WarningStderrReporter:
     help="Outline width in mm")
 @click.option("--show-lib-paths", is_flag=True,
     help="Show library paths and quit")
-def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
-         mirror, highlight, filter, vcuts, dpi, margin, silent, werror,
-         resistor_values, resistor_flip, components, paste, outline_width,
-         show_lib_paths):
+def plot(input: str, output: str, style: Optional[str], libs: List[str],
+         placeholders: bool, remap: str, drill_holes: bool, side: str,
+         mirror: bool, highlight: List[str], filter: Optional[List[str]],
+         vcuts: bool, dpi: int, margin: float, silent: bool, werror: bool,
+         resistor_values: List[str], resistor_flip: List[str], components: bool,
+         paste: bool, outline_width: float, show_lib_paths: bool) -> int:
     """
     Create a stylized drawing of the PCB.
     """
@@ -144,7 +149,7 @@ def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
     plotter.libs = libs
     plotter.render_back = side == "back"
     plotter.mirror = mirror
-    plotter.margin = margin
+    plotter.margin = mm2ki(margin)
 
     if show_lib_paths:
         print_lib_paths(plotter)
@@ -170,8 +175,11 @@ def plot(input, output, style, libs, placeholders, remap, drill_holes, side,
         sys.exit("Warning treated as errors. See output above.")
 
     save(image, output, dpi)
+    return 0
 
-def build_plot_components(remap, highlight, filter, resistor_flip, resistor_values_input):
+def build_plot_components(remap: str, highlight: List[str], filter: Optional[List[str]],
+                          resistor_flip: List[str], resistor_values_input: List[str]) \
+                          -> PlotComponents:
     remapping = load_remapping(remap)
     def remapping_fun(ref: str, lib: str, name: str) -> Tuple[str, str]:
         if ref in remapping:
@@ -192,14 +200,14 @@ def build_plot_components(remap, highlight, filter, resistor_flip, resistor_valu
         resistor_values=resistor_values)
 
     if filter is not None:
-        filter = set(filter)
+        filter_set = set(filter)
         def filter_fun(ref: str) -> bool:
-            return ref in filter
+            return ref in filter_set
         plot_components.filter = filter_fun
     if highlight is not None:
-        highlight = set(highlight)
+        highlight_set = set(highlight)
         def highlight_fun(ref: str) -> bool:
-            return ref in highlight
+            return ref in highlight_set
         plot_components.highlight = highlight_fun
     return plot_components
 
@@ -216,6 +224,12 @@ def print_lib_paths(plotter: PcbPlotter) -> None:
             print(f"- {p}")
     else:
         print("No paths for the libraries were found")
+
+def processColor(c: Tuple[Optional[int], Optional[int], Optional[int]]) \
+        -> Optional[Tuple[int, int, int]]:
+    if c[0] is not None and c[1] is not None and c[2] is not None:
+        return c[0], c[1], c[2]
+    return None
 
 
 @click.command()
@@ -239,8 +253,11 @@ def print_lib_paths(plotter: PcbPlotter) -> None:
     help="First background color")
 @click.option("--bgcolor2", type=(int, int, int), default=(None, None, None),
     help="Second background color")
-def render(input, output, side, renderer, projection, no_components, transparent,
-           padding, baseresolution, bgcolor1, bgcolor2):
+def render(input: str, output: str, side: str, renderer: str, projection: str,
+           no_components: bool, transparent: bool, padding: float,
+           baseresolution: int,
+           bgcolor1: Tuple[Optional[int], Optional[int], Optional[int]],
+           bgcolor2: Tuple[Optional[int], Optional[int], Optional[int]]) -> None:
     """
     Create a rendered image of the PCB using KiCAD's 3D Viewer
     """
@@ -249,10 +266,8 @@ def render(input, output, side, renderer, projection, no_components, transparent
 
         app = fakeKiCADGui()
 
-        if bgcolor1[0] is None:
-            bgcolor1 = None
-        if bgcolor2[0] is None:
-            bgcolor2 = None
+        bc1 = processColor(bgcolor1)
+        bc2 = processColor(bgcolor2)
 
         plan = [RenderAction(
             side=Side.FRONT if side == "front" else Side.BACK,
@@ -262,19 +277,22 @@ def render(input, output, side, renderer, projection, no_components, transparent
             postprocess=postProcessCrop(input, mm2ki(padding), mm2ki(padding), transparent)
         )]
         if transparent:
-            if bgcolor1 is not None or bgcolor2 is not None:
+            if bc1 is not None or bc2 is not None:
                 print("Transparent background was specified, ignoring colors")
-            bgcolor2 = bgcolor1 = (200, 100, 100)
+            bc2 = bc1 = (200, 100, 100)
         images = renderBoard(input, plan, baseResolution=(baseresolution, baseresolution),
-                            bgColor1=bgcolor1, bgColor2=bgcolor2)
+                            bgColor1=bc1, bgColor2=bc2)
         save(image=images[0][0], filename=output)
     except GuiPuppetError as e:
-        e.img.save("error.png")
-        e.message = "The following GUI error ocurred; image saved in error.png:\n" + e.message
+        img_save_msg = ""
+        if e.img is not None and isinstance(e.img, Image.Image):
+            e.img.save("error.png")
+            img_save_msg = "; image saved in error.png"
+        raise RuntimeError(f"The following GUI error ocurred{img_save_msg}:\n{e}")
 
 @click.group()
 @click.version_option(__version__)
-def run():
+def run() -> None:
     """
     PcbDraw generates images of KiCAD PCBs
     """

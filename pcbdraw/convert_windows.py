@@ -1,9 +1,10 @@
 import os
-import subprocess
-import LnkParse3
+# Reports false error on Linux as LnkParse3 is Windows-only dependency
+import LnkParse3 # type: ignore
+from typing import List
 from pcbdraw.convert_common import chooseInkscapeCandidate
 
-def detectInkscape():
+def detectInkscape() -> str:
     """
     Return path to working Inkscape >v1.0 executable
     """
@@ -17,7 +18,7 @@ def detectInkscape():
 
     return chooseInkscapeCandidate(candidates)
 
-def readInkscapeFromStartMenu():
+def readInkscapeFromStartMenu() -> List[str]:
     candidates = []
     for profile in [os.environ.get("ALLUSERSPROFILE", ""), os.environ.get("USERPROFILE", "")]:
         path = os.path.join(profile, "Microsoft", "Windows", "Start Menu",

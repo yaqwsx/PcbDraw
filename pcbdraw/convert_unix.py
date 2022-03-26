@@ -3,7 +3,7 @@ import os
 import textwrap
 from pcbdraw.convert_common import chooseInkscapeCandidate
 
-def detectInkscape():
+def detectInkscape() -> str:
     """
     Return path to working Inkscape >v1.0 executable
     """
@@ -15,11 +15,11 @@ def detectInkscape():
     candidates.append("inkscape") # Inkscape in path
     return chooseInkscapeCandidate(candidates)
 
-def rsvgSvgToPng(inputFilename, outputFilename, dpi):
+def rsvgSvgToPng(inputFilename: str, outputFilename: str, dpi: int) -> None:
     tool = os.environ.get("PCBDRAW_RSVG", "rsvg-convert")
     command = [tool, "--dpi-x", str(dpi), "--dpi-y", str(dpi),
                "--output", outputFilename, "--format", "png", inputFilename]
-    def reportError(message):
+    def reportError(message: str) -> None:
         raise RuntimeError(f"Cannot convert {inputFilename} to {outputFilename}. RSVG failed with:\n"
                             + textwrap.indent(message, "    "))
     try:

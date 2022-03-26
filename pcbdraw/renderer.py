@@ -9,14 +9,14 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from tempfile import TemporaryDirectory
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union, Any, Generator
 from pathlib import Path
 
-import click
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from pyvirtualdisplay.smartdisplay import SmartDisplay
 
-from .pcbnew_common import findBoardBoundingBox, pcbnew
+from .pcbnew_common import findBoardBoundingBox
+from pcbnewTransition import pcbnew # type: ignore
 
 PKG_BASE = os.path.dirname(__file__)
 DEBUG_PATH = None
@@ -33,7 +33,10 @@ class GuiPuppetError(RuntimeError):
         self.img = img
 
     def show(self) -> None:
-        self.img.show()
+        if self.img is not None:
+            self.img.show()
+        else:
+            raise RuntimeError("No image to show")
 
 
 class PcbnewSession:
@@ -41,7 +44,7 @@ class PcbnewSession:
     An interactive session with Pcbnew running in a virtual display. An instance
     of this class shouldn't be created directly, instead, use startPcbnewSession
     """
-    def __init__(self, display: SmartDisplay, pcbnewProcess: subprocess.Popen, configdir: str) -> None:
+    def __init__(self, display: SmartDisplay, pcbnewProcess: subprocess.Popen[bytes], configdir: str) -> None:
         self._display = display
         self._process = pcbnewProcess
         self._configdir = configdir
@@ -51,13 +54,13 @@ class PcbnewSession:
             [f.unlink() for f in Path(DEBUG_PATH).glob("*.png") if f.is_file()]
             self.counter = 1
 
-    def debugDump(self):
+    def debugDump(self) -> None:
         if DEBUG_PATH is None:
             return
         self.getScreenshot().save(os.path.join(DEBUG_PATH, f"{self.counter}.png"))
         self.counter += 1
 
-    def _xdotool(self, args: List[any]) -> List[str]:
+    def _xdotool(self, args: List[Any]) -> List[str]:
         """
         Run xdotool with arguments and return its output.
         """
@@ -67,7 +70,7 @@ class PcbnewSession:
         return [x.strip() for x in output.split("\n") if len(x.strip())]
 
 
-    def listWindows(self) -> Dict[str, id]:
+    def listWindows(self) -> Dict[str, int]:
         """
         List currently active windows, return mapping "Title -> id"
         """
@@ -116,8 +119,9 @@ class PcbnewSession:
             time.sleep(0.1)
         raise TimeoutError("Waiting on window close timeout")
 
-    def getScreenshot(self) -> Optional[Image.Image]:
-        image = self._display.grab(autocrop=False)
+    def getScreenshot(self) ->Image.Image:
+        image = self._display.grab(autocrop=False) # type: ignore
+        assert isinstance(image, Image.Image)
         displayWidth, displayHeight = self._display._size
         return image.crop((30, 80, displayWidth - 30, displayHeight - 50))
 
@@ -165,7 +169,7 @@ class PcbnewSession:
         if "File Open Error" in windows.keys():
             raise RuntimeError("File Open Error")
 
-    def waitForMainWindow(self) -> None:
+    def waitForMainWindow(self) -> int:
         mainId = self.waitForWindow("pcb editor",
             callback=lambda: self._dismissConfigs())
         while "Loading PCB" in self.listWindows().keys():
@@ -178,7 +182,7 @@ class PcbnewSession:
 
 
     @contextlib.contextmanager
-    def start3DViewer(self) -> None:
+    def start3DViewer(self) -> Generator[ViewerSession, None, None]:
         mainWindow = self.waitForWindow("pcb editor")
         self._xdotool(["key", "--window", mainWindow, "alt+3"])
         id = self.waitForWindow("3d viewer")
@@ -191,12 +195,12 @@ class PcbnewSession:
             self.closeWindow(id)
 
 class ViewerSession:
-    def __init__(self, parent, winId):
+    def __init__(self, parent: PcbnewSession, winId: int) -> None:
         self._parent = parent
         self._winId = winId
 
     def _sendKeys(self, keys: List[str]) -> None:
-        self._parent._xdotool(["key", "--window", self._winId] + keys)
+        self._parent._xdotool(["key", "--window", str(self._winId)] + keys)
 
     def _click(self, coords: Tuple[int, int]) -> None:
         self._parent._xdotool(["mousemove", "--window", self._winId, coords[0],
@@ -230,7 +234,7 @@ class ViewerSession:
         self._sendKeys(["T", "S", "V"])
         self._parent.waitForImmovable(threshold=20)
 
-    def captureRaytraced(self, withComponents: bool=True) -> Optional[Image.Image]:
+    def captureRaytraced(self, withComponents: bool=True) -> Image.Image:
         if not withComponents:
             self.toggleComponents()
         # Enable it
@@ -266,7 +270,7 @@ class ViewerSession:
     def rotateZ(self, angle: int) -> None:
         self._rotate(angle, (426, 44), (458, 44))
 
-    def captureRendered(self, withComponents: bool=True) -> Optional[Image.Image]:
+    def captureRendered(self, withComponents: bool=True) -> Image.Image:
         if not withComponents:
             self.toggleComponents()
             self._parent.waitForImmovable()
@@ -296,8 +300,8 @@ def duplicateKiCadSettings(outputDir: str) -> None:
 @contextlib.contextmanager
 def startPcbnewSession(resolution: Tuple[int, int]=(3000, 3000),
                        board: Optional[str]=None,
-                       adjustConfig: Callable[[str], None]=None,
-                       executable: Optional[str]="pcbnew") -> None:
+                       adjustConfig: Optional[Callable[[str], None]]=None,
+                       executable: str="pcbnew") -> Generator[PcbnewSession, None, None]:
     command = [executable]
     if board is not None:
         command.append(board)
@@ -375,7 +379,8 @@ def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
     if isinstance(board, str):
         board = pcbnew.LoadBoard(board)
     bBox = findBoardBoundingBox(board)
-    def f(plan: RenderAction, substrate: Image.Image, board: Image.Image) -> Image.Image:
+    def f(plan: RenderAction, substrate: Image.Image, board: Image.Image) \
+            -> Tuple[Image.Image, Tuple[int, int, int, int]]:
         stlx, stly, sbrx, sbry = findBoard(substrate)
         ratio = bBox.GetWidth() / (sbrx - stlx) # Number of KiCAD units per pixel
         pxVPadding = verticalPadding / ratio
@@ -409,17 +414,17 @@ class RenderAction:
     rotX: int = 0
     rotY: int = 0
     rotZ: int = 0
-    postprocess: Optional[Callable[[RenderAction, Image.Image, Image.Image], any]] = None
+    postprocess: Optional[Callable[[RenderAction, Image.Image, Image.Image], Any]] = None
     # The post-processing function takes two images: the first one is rendered
     # board substrate without any components in the simplest way possible; the
     # second image is the board redered as the user wished. The first image can
     # be used to locate the board.
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.rotX % 10 != 0 or self.rotY % 10 != 0 or self.rotZ % 10 != 0:
             raise RuntimeError("Invalid plot plan - rotation can be only multiple of 10°")
 
-    def execute(self, viewer: ViewerSession) -> any:
+    def execute(self, viewer: ViewerSession) -> Any:
         """
         Executes the plan and promises to leave the viewer in an intact way. We
         could always supply this with a fresh instance
@@ -451,7 +456,7 @@ class RenderAction:
 def renderBoard(boardFile: str, renderPlans: List[RenderAction],
                 baseResolution: Tuple[int, int]=(3000, 3000),
                 bgColor1: Optional[Tuple[int, int, int]]=None,
-                bgColor2: Optional[Tuple[int, int, int]]=None) -> List[any]:
+                bgColor2: Optional[Tuple[int, int, int]]=None) -> List[Any]:
     """
     Render KiCAD board using KiCAD's 3D renderer. Since the process has
     significant startup overhead, you can specify multiple images per board via
@@ -467,7 +472,7 @@ def renderBoard(boardFile: str, renderPlans: List[RenderAction],
     if baseResolution[0] < 800 or baseResolution[1] < 800:
         raise RuntimeError("Resolution cannot be less than 800×800px")
 
-    def updateConfig(configPath):
+    def updateConfig(configPath: str) -> None:
         colorFile = os.path.join(configPath, "colors", "user.json")
         with open(colorFile) as f:
             colors = json.load(f)
@@ -517,55 +522,4 @@ def validateExternalPrerequisites() -> None:
                    "run you process on Windows, consider running it in WSL or Docker"
         raise RuntimeError(message)
 
-
-@click.command()
-@click.argument("inputboard", type=click.Path(exists=True, dir_okay=False, file_okay=True))
-def demoRun(inputboard):
-    renderPlan = [
-        RenderAction(
-            side=Side.FRONT,
-            raytraced=True,
-            orthographic=True,
-            rotX=0,
-            rotY=0,
-            postprocess=postProcessCrop(
-                inputboard,
-                verticalPadding=0, horizontalPadding=0,
-                makeTransparent=True)
-        ),
-        RenderAction(
-            side=Side.FRONT,
-            raytraced=False,
-            orthographic=True,
-            postprocess=postProcessCrop(
-                inputboard,
-                verticalPadding=pcbnew.FromMM(5),
-                horizontalPadding=pcbnew.FromMM(5),
-                makeTransparent=True)
-        )
-    ]
-    try:
-        images = renderBoard(inputboard, renderPlan,
-            bgColor1=(255, 255, 255),
-            bgColor2=(255, 255, 255))
-    except GuiPuppetError as e:
-        print(e)
-        e.show()
-        raise e
-
-    for i, (img, pos) in enumerate(images):
-        print(pos)
-        img.save(f"output_{i+1}.png")
-
-
-
-if __name__ == "__main__":
-    import wx
-
-    validateExternalPrerequisites()
-
-    app = wx.App()
-    app.InitLocale()
-
-    demoRun()
 
