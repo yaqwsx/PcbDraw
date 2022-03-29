@@ -1,4 +1,4 @@
-name: test-kikit
+name: test-pcbdraw
 on:
   push:
   pull_request:

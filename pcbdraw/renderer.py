@@ -104,7 +104,8 @@ class PcbnewSession:
                 if any([pattern in title.lower() for pattern in titlePatterns]):
                     return id
             time.sleep(1)
-        raise TimeoutError(f"None of '{titlePatterns}' didn't appear within timeout")
+        windows_list = "\n".join([f"- {t}" for t in windows.keys()])
+        raise TimeoutError(f"None of '{titlePatterns}' didn't appear within timeout. Available windows:\n{windows_list}")
 
     def maximizeWindow(self, windowId: int) -> None:
         self._xdotool(["windowmove", windowId, "0", "0"])
@@ -184,8 +185,13 @@ class PcbnewSession:
     @contextlib.contextmanager
     def start3DViewer(self) -> Generator[ViewerSession, None, None]:
         mainWindow = self.waitForWindow("pcb editor")
-        self._xdotool(["key", "--window", mainWindow, "alt+3"])
-        id = self.waitForWindow("3d viewer")
+        try:
+            self._xdotool(["key", "--window", mainWindow, "alt+3"])
+            id = self.waitForWindow("3d viewer", 15)
+        except TimeoutError:
+            # No window shown, try it once more:
+            self._xdotool(["key", "--window", mainWindow, "alt+3"])
+            id = self.waitForWindow("3d viewer", 15)
         try:
             session = ViewerSession(self, id)
             session.waitForResponsiveness()
