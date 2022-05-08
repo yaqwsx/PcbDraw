@@ -480,6 +480,8 @@ def merge_bbox(left: Box, right: Box) -> Box:
         f(l, r) for l, r, f in zip(left, right, [min, max, min, max])
     ]) # type: ignore
 
+def hack_is_valid_bbox(box: Any): # type: ignore
+    return all(-1e15 < c < 1e15 for c in box)
 
 def shrink_svg(svg: etree.ElementTree, margin: int) -> None:
     """
@@ -497,7 +499,16 @@ def shrink_svg(svg: etree.ElementTree, margin: int) -> None:
         return
     bbox = paths[0].bbox()
     for x in paths:
-        bbox = merge_bbox(bbox, x.bbox())
+        b = x.bbox()
+        if hack_is_valid_bbox(b):
+            bbox = b
+            break
+    for x in paths:
+        box = x.bbox()
+        if not hack_is_valid_bbox(box):
+            # This is a hack due to instability in svpathtools
+            continue
+        bbox = merge_bbox(bbox, box)
     bbox = list(bbox)
     bbox[0] -= ki2svg(margin)
     bbox[1] += ki2svg(margin)
