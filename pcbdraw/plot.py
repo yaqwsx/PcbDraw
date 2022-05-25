@@ -1171,6 +1171,7 @@ class PcbPlotter():
             popt.SetScale(1)
             popt.SetMirror(False)
             popt.SetSubtractMaskFromSilk(True)
+            popt.SetDrillMarksType(0) # NO_DRILL_SHAPE
             try:
                 popt.SetPlotOutlineMode(False)
             except:
