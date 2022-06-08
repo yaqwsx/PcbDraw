@@ -255,7 +255,9 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
     if board is not None:
         board = os.path.realpath(board)
     outputpath = os.path.realpath(output)
-    os.chdir(os.path.dirname(input))
+    input_dir = os.path.dirname(input)
+    if input_dir != '':
+        os.chdir(input_dir)
 
     # If no overriding is specified, load it from the template
     try:
