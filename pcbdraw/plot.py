@@ -868,16 +868,15 @@ class PlotComponents(PlotInterface):
                          position: Tuple[int, int, float]) -> None:
         padding = mm2ki(self._plotter.get_style("highlight-padding"))
         h = etree.Element("rect", id=f"h_{ref}",
-            x=str(ki2svg(int(-padding / info.scale[0]))),
-            y=str(ki2svg(int(-padding /  info.scale[1]))),
-            width=str(ki2svg(int(info.size[0] + 2 * padding)) / info.scale[0]),
-            height=str(ki2svg(int(info.size[1] + 2 * padding)) / info.scale[1]),
+            x=str(ki2svg(-padding)),
+            y=str(ki2svg(-padding)),
+            width=str(ki2svg(info.size[0] + 2 * padding)),
+            height=str(ki2svg(info.size[1] + 2 * padding)),
             style=self._plotter.get_style("highlight-style"))
         h.attrib["transform"] = \
             f"translate({ki2svg(position[0])} {ki2svg(position[1])}) " + \
-            f"scale({info.scale[0]} {info.scale[1]}) " + \
             f"rotate({-math.degrees(position[2])}) " + \
-            f"translate({-info.origin[0]}, {-info.origin[1]})"
+            f"translate({-info.origin[0] * info.scale[0]}, {-info.origin[1] * info.scale[1]})"
         self._plotter.append_highlight_element(h)
 
     def _apply_resistor_code(self, root: etree.Element, id_prefix: str, ref: str, value: str) -> None:
