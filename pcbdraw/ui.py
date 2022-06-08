@@ -185,7 +185,11 @@ def build_plot_components(remap: str, highlight: List[str], filter: Optional[Lis
     remapping = load_remapping(remap)
     def remapping_fun(ref: str, lib: str, name: str) -> Tuple[str, str]:
         if ref in remapping:
-            return remapping[ref]
+            remapped_lib, remapped_name = remapping[ref]
+            if name.endswith('.back'):
+                return remapped_lib, remapped_name + '.back'
+            else:
+                return remapped_lib, remapped_name
         return lib, name
 
     resistor_values = {}
