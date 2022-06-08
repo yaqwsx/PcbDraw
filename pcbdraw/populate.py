@@ -271,7 +271,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
                 raise KeyError("template")
             template = header["template"]
     except KeyError as e:
-        sys.exit(f"Missing parameter {e} either in template file of source header")
+        sys.exit(f"Missing parameter {e} either in template file or source header")
 
     if type == "html":
         renderer = Renderer(mistune.Renderer) # type: ignore
