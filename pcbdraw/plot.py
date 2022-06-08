@@ -432,11 +432,11 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
     e = etree.Element("path", d=path, style="fill-rule: evenodd;")
     return e
 
-def component_to_board_scale(svg: etree.Element) -> Tuple[float, float]:
+def component_to_board_scale_and_offset(svg: etree.Element) -> Tuple[float, float]:
     width = ki2svg(to_kicad_basic_units(svg.attrib["width"]))
     height = ki2svg(to_kicad_basic_units(svg.attrib["height"]))
     x, y, vw, vh = [float(x) for x in svg.attrib["viewBox"].split()]
-    return width / vw, height / vh
+    return width / vw, height / vh, x, y
 
 def load_style(style_file: str) -> Dict[str, Any]:
     try:
@@ -770,6 +770,7 @@ class PlotSubstrate(PlotInterface):
 class PlacedComponentInfo:
     id: str
     origin: Tuple[float, float]
+    svg_offset: Tuple[float, float]
     scale: Tuple[float, float]
     size: Tuple[float, float]
 
@@ -854,10 +855,11 @@ class PlotComponents(PlotInterface):
             origin.getparent().remove(origin)
         else:
             self._plotter.yield_warning("origin", f"component: Component {lib}:{name} has not origin")
-        svg_scale_x, svg_scale_y = component_to_board_scale(svg_tree)
+        svg_scale_x, svg_scale_y, svg_offset_x, svg_offset_y = component_to_board_scale_and_offset(svg_tree)
         component_info = PlacedComponentInfo(
             id=xml_id,
             origin=(origin_x, origin_y),
+            svg_offset=(svg_offset_x, svg_offset_y),
             scale=(svg_scale_x, svg_scale_y),
             size=(to_kicad_basic_units(svg_tree.attrib["width"]), to_kicad_basic_units(svg_tree.attrib["height"]))
         )
@@ -876,7 +878,7 @@ class PlotComponents(PlotInterface):
         h.attrib["transform"] = \
             f"translate({ki2svg(position[0])} {ki2svg(position[1])}) " + \
             f"rotate({-math.degrees(position[2])}) " + \
-            f"translate({-info.origin[0] * info.scale[0]}, {-info.origin[1] * info.scale[1]})"
+            f"translate({-(info.origin[0] - info.svg_offset[0]) * info.scale[0]}, {-(info.origin[1] - info.svg_offset[1]) * info.scale[1]})"
         self._plotter.append_highlight_element(h)
 
     def _apply_resistor_code(self, root: etree.Element, id_prefix: str, ref: str, value: str) -> None:
