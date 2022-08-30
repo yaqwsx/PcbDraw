@@ -263,7 +263,8 @@ def mm2ki(val: float) -> int:
     return int(val * 1000000)
 
 # KiCAD 5 and KiCAD 6 use different units of the SVG
-ki2svg: Callable[[int], float] = (lambda x: int(x)) if isV6(KICAD_VERSION) else ki2dmil
+#ki2svg: Callable[[int], float] = (lambda x: int(x)) if isV6(KICAD_VERSION) else ki2dmil
+ki2svg: Callable[[int], float] = ki2mm if isV6(KICAD_VERSION) else ki2dmil
 svg2ki: Callable[[float], int] = (lambda x: int(x)) if isV6(KICAD_VERSION) else dmil2ki
 
 def to_kicad_basic_units(val: str) -> int:
@@ -401,34 +402,32 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
                 s = " M {0} {1} m-{2} 0 a {2} {2} 0 1 0 {3} 0 a {2} {2} 0 1 0 -{3} 0 ".format(
                     att["cx"], att["cy"], att["r"], 2 * float(att["r"]))
                 path += s
+    # Compute the outline
+    outline = [elements[0]]
+    elements = elements[1:]
     while len(elements) > 0:
-        # Initiate seed for the outline
-        outline = [elements[0]]
-        elements = elements[1:]
-        size = 0
-        # Append new segments to the ends of outline until there is none to append.
-        while size != len(outline):
-            size = len(outline)
-            for i, e in enumerate(elements):
-                if SvgPathItem.is_same(outline[0].start, e.end):
-                    outline.insert(0, e)
-                elif SvgPathItem.is_same(outline[0].start, e.start):
-                    e.flip()
-                    outline.insert(0, e)
-                elif SvgPathItem.is_same(outline[-1].end, e.start):
-                    outline.append(e)
-                elif SvgPathItem.is_same(outline[-1].end, e.end):
-                    e.flip()
-                    outline.append(e)
-                else:
-                    continue
-                del elements[i]
+        found = -1
+        for i, e in enumerate(elements):
+            # Add before the first in outline
+            if SvgPathItem.is_same(outline[0].start, e.end):
+                outline.insert(0, e)
+                found = i
                 break
-        # ...then, append it to path.
-        first = True
-        for x in outline:
-            path += x.format(first)
-            first = False
+            # Add after the first in outline
+            elif SvgPathItem.is_same(outline[-1].end, e.start):
+                outline.append(e)
+                found = i
+                break
+        if found == -1:
+            print("Didn't manage to compute the outline of the board")
+            break
+        del elements[i]
+        found = -1
+    # ...then, append it to path.
+    first = True
+    for x in outline:
+        path += x.format(first)
+        first = False
     e = etree.Element("path", d=path, style="fill-rule: evenodd;")
     return e
 
@@ -520,8 +519,8 @@ def shrink_svg(svg: etree.ElementTree, margin: int) -> None:
         bbox[0], bbox[2],
         bbox[1] - bbox[0], bbox[3] - bbox[2]
     )
-    root.attrib["width"] = str(ki2mm(svg2ki(bbox[1] - bbox[0]))) + "mm"
-    root.attrib["height"] = str(ki2mm(svg2ki(bbox[3] - bbox[2]))) + "mm"
+    root.attrib["width"] = str(bbox[1] - bbox[0]) + "mm"
+    root.attrib["height"] = str(bbox[3] - bbox[2]) + "mm"
 
 def remove_empty_elems(tree: etree.Element) -> None:
     """
@@ -594,7 +593,7 @@ def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
             pos = pad.GetPosition()
             holes.append(Hole(
                 position=(pos[0], pos[1]),
-                orientation=pad.GetOrientation(),
+                orientation=pad.GetOrientation().AsDegrees(),
                 drillsize=(pad.GetDrillSizeX(), pad.GetDrillSizeY())
             ))
     for track in board.GetTracks():
@@ -693,7 +692,7 @@ class PlotSubstrate(PlotInterface):
             el = etree.SubElement(layer, "path")
             el.attrib["d"] = hole.get_svg_path_d()
             el.attrib["transform"] = "translate({} {}) rotate({})".format(
-                position[0], position[1], -hole.orientation / 10)
+                position[0], position[1], -hole.orientation)
 
     def _process_baselayer(self, name: str, source_filename: str) -> None:
         clipPath = self._plotter.get_def_slot(tag_name="clipPath", id="cut-off")
@@ -764,7 +763,7 @@ class PlotSubstrate(PlotInterface):
                 el.attrib["stroke-width"] = str(stroke)
                 el.attrib["points"] = points
                 el.attrib["transform"] = "translate({} {}) rotate({})".format(
-                    position[0], position[1], -hole.orientation / 10)
+                    position[0], position[1], -hole.orientation)
 
 @dataclass
 class PlacedComponentInfo:
@@ -1054,7 +1053,7 @@ class PcbPlotter():
             value = footprint.GetValue().strip()
             ref = footprint.GetReference().strip()
             center = footprint.GetPosition()
-            orient = math.radians(footprint.GetOrientation() / 10)
+            orient = math.radians(footprint.GetOrientation().AsDegrees())
             pos = (center.x, center.y, orient)
             callback(lib, name, ref, value, pos)
 
@@ -1172,6 +1171,8 @@ class PcbPlotter():
             popt.SetMirror(False)
             popt.SetSubtractMaskFromSilk(True)
             popt.SetDrillMarksType(0) # NO_DRILL_SHAPE
+            # This is needed because Kicad will crash if there is no selected layer when first opening up the plot file
+            pctl.SetLayer(pcbnew.Edge_Cuts)
             try:
                 popt.SetPlotOutlineMode(False)
             except:
@@ -1203,12 +1204,12 @@ class PcbPlotter():
             self._document = empty_svg(
                 width=f"{ki2mm(bb.GetWidth())}mm",
                 height=f"{ki2mm(bb.GetHeight())}mm",
-                viewBox=f"{ki2svg(-bb.GetWidth() - bb.GetX())} {ki2svg(bb.GetY())} {ki2svg(bb.GetWidth())} {ki2svg(bb.GetHeight())}")
+                viewBox=f"{ki2svg(-bb.GetWidth() + bb.GetX())} {ki2svg(-bb.GetHeight() + bb.GetY())} {ki2svg(bb.GetX() + 2 * bb.GetWidth())} {ki2svg(bb.GetY() + 2 * bb.GetHeight())}")
         else:
             self._document = empty_svg(
                 width=f"{ki2mm(bb.GetWidth())}mm",
                 height=f"{ki2mm(bb.GetHeight())}mm",
-                viewBox=f"{ki2svg(bb.GetX())} {ki2svg(bb.GetY())} {ki2svg(bb.GetWidth())} {ki2svg(bb.GetHeight())}")
+                viewBox=f"{ki2svg(-bb.GetWidth() + bb.GetX())} {ki2svg(-bb.GetHeight() + bb.GetY())} {ki2svg(bb.GetX() + 2 * bb.GetWidth())} {ki2svg(bb.GetY() + 2 * bb.GetHeight())}")
 
         self._defs = etree.SubElement(self._document.getroot(), "defs")
         self._board_cont = etree.SubElement(self._document.getroot(), "g", transform=transform_string)
