@@ -10,6 +10,8 @@ from itertools import chain
 from typing import List, Optional, Any, Tuple, Dict
 
 import click
+from mistune.plugins.table import plugin_table
+from mistune.plugins.footnotes import plugin_footnotes
 import mistune # type: ignore
 import pybars # type: ignore
 import yaml
@@ -21,24 +23,25 @@ from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
 
-class PcbDrawInlineLexer(mistune.InlineLexer): # type: ignore
+def parse_pcbdraw(lexer, m: re.Match[str], state) -> Any:
+    text = m.group(1)
+    side, components = text.split("|")
+    components = list(map(lambda x: x.strip(), components.split(",")))
+    return 'pcbdraw', side, components
+
+class PcbDrawInlineLexer(mistune.inline_parser.InlineParser): # type: ignore
     def __init__(self, renderer: Any, **kwargs: Any) -> None:
-        super(PcbDrawInlineLexer, self).__init__(renderer, rules=None, **kwargs)
+        super(PcbDrawInlineLexer, self).__init__(renderer, **kwargs)
         self.enable_pcbdraw()
 
     def enable_pcbdraw(self) -> None:
-        self.rules.pcbdraw = re.compile(
+        pcbdraw_pattern = (
             r"\[\["                   # [[
             r"([\s\S]+?\|[\s\S]+?)"   # side| component
             r"\]\](?!\])"             # ]]
         )
-        self.default_rules.insert(3, "pcbdraw")
-
-    def output_pcbdraw(self, m: re.Match[str]) -> Any:
-        text = m.group(1)
-        side, components = text.split("|")
-        components = list(map(lambda x: x.strip(), components.split(",")))
-        return self.renderer.pcbdraw(side, components)
+        self.rules.insert(3, 'pcbdraw')
+        self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw) 
 
 def Renderer(BaseRenderer): # type: ignore
     class Tmp(BaseRenderer): # type: ignore
@@ -84,8 +87,8 @@ def Renderer(BaseRenderer): # type: ignore
             self.active_components = components
             return ""
 
-        def block_code(self, code: str, lang: str) -> Any:
-            retval = super(Tmp, self).block_code(code, lang)
+        def block_code(self, children: str, info: Optional[str]=None) -> Any:
+            retval = super(Tmp, self).block_code(children, info)
             self.append_comment(retval)
             return retval
 
@@ -99,20 +102,20 @@ def Renderer(BaseRenderer): # type: ignore
             self.append_comment(retval)
             return retval
 
-        def header(self, text: str, level: int, raw: Optional[str]=None) -> Any:
-            retval = super(Tmp, self).header(text, level, raw)
+        def heading(self, children: str, level: int) -> Any:
+            retval = super(Tmp, self).heading(children, level)
             self.append_comment(retval)
             return retval
 
-        def hrule(self) -> Any:
-            retval = super(Tmp, self).hrule()
+        def thematic_break(self) -> Any:
+            retval = super(Tmp, self).thematic_break()
             self.append_comment(retval)
             return retval
 
-        def list(self, body: Any, ordered: bool=True) -> str:
+        def list(self, text: Any, ordered: bool, level, start=None) -> str:
             return ""
 
-        def list_item(self, text: str) -> str:
+        def list_item(self, text: str, level) -> str:
             step = {
                 "side": self.active_side,
                 "components": self.visited_components,
@@ -147,6 +150,8 @@ def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
 def parse_content(renderer: Any, content: str) -> List[Dict[str, Any]]:
     lexer = PcbDrawInlineLexer(renderer)
     processor = mistune.Markdown(renderer=renderer, inline=lexer)
+    plugin_table(processor)
+    plugin_footnotes(processor)
     processor(content)
     return renderer.output() # type: ignore
 
@@ -274,7 +279,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         sys.exit(f"Missing parameter {e} either in template file of source header")
 
     if type == "html":
-        renderer = Renderer(mistune.Renderer) # type: ignore
+        renderer = Renderer(mistune.renderers.HTMLRenderer) # type: ignore
         outputfile = "index.html"
         try:
             assert template is not None

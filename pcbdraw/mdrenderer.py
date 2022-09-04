@@ -12,10 +12,13 @@
     :licence: WTFPL 2
 """
 
-from mistune import Renderer  # type: ignore
+from mistune.renderers import BaseRenderer  # type: ignore
 
 
-class MdRenderer(Renderer):
+class MdRenderer(BaseRenderer):
+    def __init__(self, **kwargs):
+        super(MdRenderer, self).__init__()
+
     def get_block(text):
         type = text[0]
         p = text.find(':')
@@ -37,7 +40,7 @@ class MdRenderer(Renderer):
     def hrule(self):
         return '---\n'
 
-    def header(self, text, level, raw=None):
+    def heading(self, text, level, raw=None):
         return '#'*level + " " + text + '\n\n'
 
     def paragraph(self, text):
@@ -53,6 +56,9 @@ class MdRenderer(Renderer):
 
     def list_item(self, text):
         return 'l' + str(len(text)) + ':' + text
+
+    def block_text(self, text):
+        return text
 
     def block_code(self, code, lang=None):
         return '```\n' + code + '\n```\n'
@@ -188,3 +194,6 @@ class MdRenderer(Renderer):
 
     def footnotes(self, text):
         return text
+
+    def finalize(self, data):
+        return ''.join(data)
