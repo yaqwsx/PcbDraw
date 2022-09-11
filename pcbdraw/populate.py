@@ -10,8 +10,8 @@ from itertools import chain
 from typing import List, Optional, Any, Tuple, Dict
 
 import click
-from mistune.plugins.table import plugin_table
-from mistune.plugins.footnotes import plugin_footnotes
+from mistune.plugins.table import plugin_table # type: ignore
+from mistune.plugins.footnotes import plugin_footnotes # type: ignore
 import mistune # type: ignore
 import pybars # type: ignore
 import yaml
@@ -23,7 +23,7 @@ from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
 
-def parse_pcbdraw(lexer, m: re.Match[str], state) -> Any:
+def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any) -> Any:
     text = m.group(1)
     side, components = text.split("|")
     components = list(map(lambda x: x.strip(), components.split(",")))
@@ -41,7 +41,7 @@ class PcbDrawInlineLexer(mistune.inline_parser.InlineParser): # type: ignore
             r"\]\](?!\])"             # ]]
         )
         self.rules.insert(3, 'pcbdraw')
-        self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw) 
+        self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw)
 
 def Renderer(BaseRenderer): # type: ignore
     class Tmp(BaseRenderer): # type: ignore
@@ -112,10 +112,10 @@ def Renderer(BaseRenderer): # type: ignore
             self.append_comment(retval)
             return retval
 
-        def list(self, text: Any, ordered: bool, level, start=None) -> str:
+        def list(self, text: Any, ordered: bool, level: Any, start: Any=None) -> str:
             return ""
 
-        def list_item(self, text: str, level) -> str:
+        def list_item(self, text: str, level: Any) -> str:
             step = {
                 "side": self.active_side,
                 "components": self.visited_components,
