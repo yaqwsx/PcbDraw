@@ -432,7 +432,7 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
     e = etree.Element("path", d=path, style="fill-rule: evenodd;")
     return e
 
-def component_to_board_scale_and_offset(svg: etree.Element) -> Tuple[float, float]:
+def component_to_board_scale_and_offset(svg: etree.Element) -> Tuple[float, float, float, float]:
     width = ki2svg(to_kicad_basic_units(svg.attrib["width"]))
     height = ki2svg(to_kicad_basic_units(svg.attrib["height"]))
     x, y, vw, vh = [float(x) for x in svg.attrib["viewBox"].split()]
@@ -872,8 +872,8 @@ class PlotComponents(PlotInterface):
         h = etree.Element("rect", id=f"h_{ref}",
             x=str(ki2svg(-padding)),
             y=str(ki2svg(-padding)),
-            width=str(ki2svg(info.size[0] + 2 * padding)),
-            height=str(ki2svg(info.size[1] + 2 * padding)),
+            width=str(ki2svg(int(info.size[0] + 2 * padding))),
+            height=str(ki2svg(int(info.size[1] + 2 * padding))),
             style=self._plotter.get_style("highlight-style"))
         h.attrib["transform"] = \
             f"translate({ki2svg(position[0])} {ki2svg(position[1])}) " + \
