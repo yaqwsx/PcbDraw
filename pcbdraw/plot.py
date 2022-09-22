@@ -11,7 +11,7 @@ import sysconfig
 import tempfile
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Callable, Dict, List, Optional, Tuple, Union, Any
+from typing import Callable, Dict, List, Optional, Tuple, TypeVar, Union, Any
 
 import numpy as np
 import numpy.typing
@@ -21,6 +21,7 @@ from lxml import etree, objectify # type: ignore
 from pcbnewTransition import KICAD_VERSION, isV6, pcbnew # type: ignore
 
 # Type
+T = TypeVar("T")
 Numeric = Union[int, float]
 Point = Tuple[Numeric, Numeric]
 Matrix = np.typing.NDArray[np.float32]
@@ -117,6 +118,16 @@ class SvgPathItem:
 
 def matrix(data: List[List[Numeric]]) -> Matrix:
     return np.array(data, dtype=np.float32)
+
+def pseudo_distance(a: Point, b: Point) -> Numeric:
+    return (a[0] - b[0])**2 + (a[1] - b[1])**2
+
+def distance(a: Point, b: Point) -> Numeric:
+    return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+
+def get_closest(reference: Point, elems: List[Point]) -> int:
+    distances = [pseudo_distance(reference, x) for x in elems]
+    return np.argmin(distances)
 
 def extract_arg(args: List[Any], index: int, default: Any=None) -> Any:
     """
@@ -407,23 +418,36 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
         elements = elements[1:]
         size = 0
         # Append new segments to the ends of outline until there is none to append.
-        while size != len(outline):
+        while size != len(outline) and len(elements) > 0:
             size = len(outline)
-            for i, e in enumerate(elements):
-                if SvgPathItem.is_same(outline[0].start, e.end):
-                    outline.insert(0, e)
-                elif SvgPathItem.is_same(outline[0].start, e.start):
-                    e.flip()
-                    outline.insert(0, e)
-                elif SvgPathItem.is_same(outline[-1].end, e.start):
-                    outline.append(e)
-                elif SvgPathItem.is_same(outline[-1].end, e.end):
-                    e.flip()
-                    outline.append(e)
-                else:
-                    continue
+
+            i = get_closest(outline[0].start, [x.end for x in elements])
+            if SvgPathItem.is_same(outline[0].start, elements[i].end):
+                outline.insert(0, elements[i])
                 del elements[i]
-                break
+                continue
+
+            i = get_closest(outline[0].start, [x.start for x in elements])
+            if SvgPathItem.is_same(outline[0].start, elements[i].start):
+                e = elements[i]
+                e.flip()
+                outline.insert(0, e)
+                del elements[i]
+                continue
+
+            i = get_closest(outline[-1].end, [x.start for x in elements])
+            if SvgPathItem.is_same(outline[-1].end, elements[i].start):
+                outline.insert(0, elements[i])
+                del elements[i]
+                continue
+
+            i = get_closest(outline[-1].end, [x.end for x in elements])
+            if SvgPathItem.is_same(outline[-1].end, elements[i].end):
+                e = elements[i]
+                e.flip()
+                outline.insert(0, e)
+                del elements[i]
+                continue
         # ...then, append it to path.
         first = True
         for x in outline:
