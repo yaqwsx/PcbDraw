@@ -43,14 +43,14 @@ class PcbDrawInlineLexer(mistune.inline_parser.InlineParser): # type: ignore
         self.rules.insert(3, 'pcbdraw')
         self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw)
 
-def Renderer(BaseRenderer): # type: ignore
+def Renderer(BaseRenderer, initial_components: List[str]): # type: ignore
     class Tmp(BaseRenderer): # type: ignore
-        def __init__(self) -> None:
+        def __init__(self, initial_components: List[str]) -> None:
             super(Tmp, self).__init__(escape=False)
             self.items: List[Dict[str, Any]]= []
             self.current_item: Optional[Dict[str, Any]] = None
             self.active_side: str = "front"
-            self.visited_components: List[str] = []
+            self.visited_components: List[str] = initial_components
             self.active_components: List[str] = []
 
         def append_comment(self, html: str) -> None:
@@ -134,7 +134,7 @@ def Renderer(BaseRenderer): # type: ignore
             retval = super(Tmp, self).table(header, body)
             self.append_comment(retval)
             return retval
-    return Tmp()
+    return Tmp(initial_components)
 
 def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
     header = None
@@ -185,7 +185,7 @@ def generate_images(content: List[Dict[str, Any]], boardfilename: str,
         os.makedirs(dir)
     counter = 0
     for item in content:
-        if item["type"] == "comment":
+        if item["type"] != "steps":
             continue
         for x in item["steps"]:
             counter += 1
@@ -281,7 +281,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         sys.exit(f"Missing parameter {e} either in template file or source header")
 
     if type == "html":
-        renderer = Renderer(mistune.renderers.HTMLRenderer) # type: ignore
+        renderer = Renderer(mistune.renderers.HTMLRenderer, header.get("initial_components")) # type: ignore
         outputfile = "index.html"
         try:
             assert template is not None
@@ -292,7 +292,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         except IOError:
             sys.exit("Cannot open template file " + str(template))
     else:
-        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer) # type: ignore
+        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer, header.get("initial_components")) # type: ignore
         outputfile = "index.md"
     parsed_content = parse_content(renderer, content)
     if header is None:

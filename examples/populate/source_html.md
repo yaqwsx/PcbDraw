@@ -6,6 +6,9 @@ imgname: img/populating_{}.png
 template: simple
 type: html
 board: ../resources/ArduinoLearningKitStarter.kicad_pcb
+initial_components:
+  - C1
+  - R13
 ...
 
 # Demo population manual

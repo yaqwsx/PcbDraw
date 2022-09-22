@@ -50,6 +50,9 @@ template: simple
 type: html
 board: ../ArduinoLearningKitStarter/ArduinoLearningKitStarter.kicad_pcb
 libs: KiCAD-6
+initial_components:
+    - C1
+    - R13
 ...
 ```
 
