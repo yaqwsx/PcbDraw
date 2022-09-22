@@ -281,7 +281,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         sys.exit(f"Missing parameter {e} either in template file or source header")
 
     if type == "html":
-        renderer = Renderer(mistune.renderers.HTMLRenderer, header.get("initial_components")) # type: ignore
+        renderer = Renderer(mistune.renderers.HTMLRenderer, header.get("initial_components", [])) # type: ignore
         outputfile = "index.html"
         try:
             assert template is not None
@@ -292,7 +292,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         except IOError:
             sys.exit("Cannot open template file " + str(template))
     else:
-        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer, header.get("initial_components")) # type: ignore
+        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer, header.get("initial_components", [])) # type: ignore
         outputfile = "index.md"
     parsed_content = parse_content(renderer, content)
     if header is None:
