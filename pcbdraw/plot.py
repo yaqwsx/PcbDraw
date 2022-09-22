@@ -127,7 +127,7 @@ def distance(a: Point, b: Point) -> Numeric:
 
 def get_closest(reference: Point, elems: List[Point]) -> int:
     distances = [pseudo_distance(reference, x) for x in elems]
-    return np.argmin(distances)
+    return int(np.argmin(distances))
 
 def extract_arg(args: List[Any], index: int, default: Any=None) -> Any:
     """

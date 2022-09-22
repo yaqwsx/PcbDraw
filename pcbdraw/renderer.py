@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from typing import Callable, Dict, List, Optional, Tuple, Union, Any, Generator
 from pathlib import Path
 import numpy as np
+import numpy.typing
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from pyvirtualdisplay.smartdisplay import SmartDisplay
@@ -399,7 +400,7 @@ def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
             pixel = board.getpixel((1, 1))
 
             ImageDraw.floodfill(board, (1, 1), (0, 0, 0, 0), thresh=30)
-            npBoard = np.array(board)
+            npBoard = np.array(board) # type: ignore
             yVec, xVec = np.where(np.all(npBoard == pixel, axis=2))
             for pos in zip(xVec, yVec):
                 ImageDraw.floodfill(board, pos, (0, 0, 0, 0), thresh=30)
