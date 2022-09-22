@@ -397,13 +397,18 @@ def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
 
         if makeTransparent:
             board = board.convert("RGBA")
-            pixel = board.getpixel((1, 1))
+            pixel = np.array(board.getpixel((1, 1)))
 
-            ImageDraw.floodfill(board, (1, 1), (0, 0, 0, 0), thresh=30)
             npBoard = np.array(board) # type: ignore
-            yVec, xVec = np.where(np.all(npBoard == pixel, axis=2))
-            for pos in zip(xVec, yVec):
-                ImageDraw.floodfill(board, pos, (0, 0, 0, 0), thresh=30)
+            # This isn't the fastest way, but given the cost of raytracing it is
+            # good enough for now.
+            for rId, row in enumerate(npBoard):
+                for cId, elem in enumerate(row):
+                    fPix = np.array([int(x) for x in elem])
+                    distance = np.linalg.norm(fPix - pixel)
+                    if distance < 20:
+                        ImageDraw.floodfill(board, (cId, rId), (0, 0, 0, 0), thresh=30)
+
 
 
         btlx -= pxHPadding
