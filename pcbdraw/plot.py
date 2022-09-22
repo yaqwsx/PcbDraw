@@ -13,9 +13,9 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable, Dict, List, Optional, Tuple, Union, Any
 
-import engineering_notation # type: ignore
 import numpy as np
 import numpy.typing
+from pcbdraw.unit import read_resistance
 import svgpathtools # type: ignore
 from lxml import etree, objectify # type: ignore
 from pcbnewTransition import KICAD_VERSION, isV6, pcbnew # type: ignore
@@ -920,7 +920,7 @@ class PlotComponents(PlotInterface):
         res, tolerance = None, "5%"
         try:
             value_l = value.split(" ", maxsplit=1)
-            res = engineering_notation.EngNumber(value_l[0]).number
+            res = read_resistance(value_l[0])
             if len(value_l) > 1:
                 t_string = value_l[1].strip().replace(" ", "")
                 if "%" in t_string:
