@@ -21,11 +21,6 @@ easily specify & maintain nice looking HTML or Markdown population manuals.
 And, also, as a bonus it allows you to programmatically obtain 3D-rendered
 previews of your boards (e.g., in CI).
 
-# PcbDraw is undergoing breaking changes towards version 1.0
-
-If you are looking for documentation, please see [v0.9
-doc](https://github.com/yaqwsx/PcbDraw/tree/v0.9.0).
-
 ## Installation
 
 PcbDraw is a stand-alone CLI tool distributed as a Python package `pcbdraw`. It
