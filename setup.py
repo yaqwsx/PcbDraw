@@ -29,7 +29,7 @@ setuptools.setup(
         "mistune>=2.0.2",
         "pybars3",
         "pyyaml",
-        "svgpathtools==1.5.1",
+        "svgpathtools==1.4.1",
         "pcbnewTransition>=0.2",
         "LnkParse3; platform_system=='Windows'",
         "pyVirtualDisplay~=3.0; platform_system!='Windows'",
