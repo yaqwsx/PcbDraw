@@ -951,20 +951,20 @@ class PlotComponents(PlotInterface):
 
     def _get_resistance_from_value(self, value: str) -> Tuple[Decimal, str]:
         res, tolerance = None, "5%"
+        value_l = value.split(" ", maxsplit=1)
         try:
-            value_l = value.split(" ", maxsplit=1)
             res = read_resistance(value_l[0])
-            if len(value_l) > 1:
-                t_string = value_l[1].strip().replace(" ", "")
-                if "%" in t_string:
-                    s = self._plotter.get_style("tht-resistor-band-colors")
-                    if not isinstance(s, dict):
-                        raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
-                    if t_string.strip() not in s:
-                        raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
-                    tolerance = t_string
-        except decimal.InvalidOperation:
-            raise UserWarning(f"Invalid value {value}") from None
+        except ValueError:
+            raise UserWarning(f"Invalid resistor value {value_l[0]}")
+        if len(value_l) > 1:
+            t_string = value_l[1].strip().replace(" ", "")
+            if "%" in t_string:
+                s = self._plotter.get_style("tht-resistor-band-colors")
+                if not isinstance(s, dict):
+                    raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
+                if t_string.strip() not in s:
+                    raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
+                tolerance = t_string
         return res, tolerance
 
 
