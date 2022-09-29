@@ -217,7 +217,7 @@ def generate_image(boardfilename: str, side: str, components: List[str],
 def get_data_path() -> List[str]:
     paths: List[str] = []
     paths += filter(lambda x: len(x) > 0, os.environ.get("PCBDRAW_LIB_PATH", "").split(":"))
-    paths += [os.path.join(PKG_BASE, "resources", "templates")]
+    paths += [os.path.join(PKG_BASE, "resources")]
     paths += get_global_datapaths()
     return paths
 
@@ -285,7 +285,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         outputfile = "index.html"
         try:
             assert template is not None
-            template_file = find_data_file(template, '.handlebars', data_path)
+            template_file = find_data_file(template, '.handlebars', data_path, "templates")
             if template_file is None:
                 raise RuntimeError(f"Cannot find template '{template}'")
             template = read_template(template_file)
