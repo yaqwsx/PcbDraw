@@ -12,7 +12,10 @@ from tempfile import TemporaryDirectory
 from typing import Callable, Dict, List, Optional, Tuple, Union, Any, Generator
 from pathlib import Path
 import numpy as np
-import numpy.typing
+try:
+    import numpy.typing
+except ModuleNotFoundError:
+    pass
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from pyvirtualdisplay.smartdisplay import SmartDisplay

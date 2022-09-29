@@ -14,7 +14,10 @@ from decimal import Decimal
 from typing import Callable, Dict, List, Optional, Tuple, TypeVar, Union, Any
 
 import numpy as np
-import numpy.typing
+try:
+    import numpy.typing
+except ModuleNotFoundError:
+    pass
 from pcbdraw.unit import read_resistance
 import svgpathtools # type: ignore
 from lxml import etree, objectify # type: ignore
@@ -24,7 +27,8 @@ from pcbnewTransition import KICAD_VERSION, isV6, pcbnew # type: ignore
 T = TypeVar("T")
 Numeric = Union[int, float]
 Point = Tuple[Numeric, Numeric]
-Matrix = np.typing.NDArray[np.float32]
+# Matrix = np.typing.NDArray[np.float32] Disabled because we not always have np.typing
+Matrix = Any
 Box = Tuple[Numeric, Numeric, Numeric, Numeric]
 
 
