@@ -86,7 +86,7 @@ class WarningStderrReporter:
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--style", "-s", type=str, default=None,
     help="A name of built-in style or a path to style file")
-@click.option("--libs", "-l", type=CommaList(), default=["KiCAD-6"],
+@click.option("--libs", "-l", type=CommaList(), default=["KiCAD-base"],
     help="Comma separated list of libraries to use")
 @click.option("--placeholders", "-p", is_flag=True,
     help="Render placeholders to show the components origins")
