@@ -10,9 +10,16 @@ from itertools import chain
 from typing import List, Optional, Any, Tuple, Dict
 
 import click
-from mistune.plugins.table import plugin_table # type: ignore
-from mistune.plugins.footnotes import plugin_footnotes # type: ignore
 import mistune # type: ignore
+# The following try-catch is used to support mistune 0.8.4 and 2.x
+try:
+    from mistune.plugins.table import plugin_table # type: ignore
+    from mistune.plugins.footnotes import plugin_footnotes # type: ignore
+    InlineParser = mistune.inline_parser.InlineParser
+    HTMLRenderer = mistune.renderers.HTMLRenderer
+except ModuleNotFoundError:
+    InlineParser = mistune.InlineLexer
+    HTMLRenderer = mistune.Renderer
 import pybars # type: ignore
 import yaml
 
@@ -23,13 +30,13 @@ from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
 
-def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any) -> Any:
+def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any=None) -> Any:
     text = m.group(1)
     side, components = text.split("|")
     components = list(map(lambda x: x.strip(), components.split(",")))
     return 'pcbdraw', side, components
 
-class PcbDrawInlineLexer(mistune.inline_parser.InlineParser): # type: ignore
+class PcbDrawInlineLexer(InlineParser): # type: ignore
     def __init__(self, renderer: Any, **kwargs: Any) -> None:
         super(PcbDrawInlineLexer, self).__init__(renderer, **kwargs)
         self.enable_pcbdraw()
@@ -40,8 +47,21 @@ class PcbDrawInlineLexer(mistune.inline_parser.InlineParser): # type: ignore
             r"([\s\S]+?\|[\s\S]+?)"   # side| component
             r"\]\](?!\])"             # ]]
         )
-        self.rules.insert(3, 'pcbdraw')
-        self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw)
+        if hasattr(self, 'register_rule'):
+            # mistune v2 API
+            self.rules.insert(3, 'pcbdraw')
+            self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw)
+        else:
+            # mistune v0.8.4
+            self.rules.pcbdraw = re.compile(pcbdraw_pattern)
+            self.default_rules.insert(3, 'pcbdraw')
+
+    # This method is invoked by the old mistune API (i.e. v0.8.4)
+    # For the new API we register `parse_pcbdraw`
+    def output_pcbdraw(self, m: re.Match[str]) -> Any:
+        _, side, components = parse_pcbdraw(self, m)
+        return self.renderer.pcbdraw(side, components)
+
 
 def Renderer(BaseRenderer, initial_components: List[str]): # type: ignore
     class Tmp(BaseRenderer): # type: ignore
@@ -107,15 +127,27 @@ def Renderer(BaseRenderer, initial_components: List[str]): # type: ignore
             self.append_comment(retval)
             return retval
 
+        # Mistune 0.8.4 API
+        def header(self, text: str, level: int, raw: Optional[str]=None) -> Any:
+            retval = super(Tmp, self).header(text, level, raw)
+            self.append_comment(retval)
+            return retval
+
+        # Mistune 0.8.4 API
+        def hrule(self) -> Any:
+            retval = super(Tmp, self).hrule()
+            self.append_comment(retval)
+            return retval
+
         def thematic_break(self) -> Any:
             retval = super(Tmp, self).thematic_break()
             self.append_comment(retval)
             return retval
 
-        def list(self, text: Any, ordered: bool, level: Any, start: Any=None) -> str:
+        def list(self, text: Any, ordered: bool, level: Any=None, start: Any=None) -> str:
             return ""
 
-        def list_item(self, text: str, level: Any) -> str:
+        def list_item(self, text: str, level: Any=None) -> str:
             step = {
                 "side": self.active_side,
                 "components": self.visited_components,
@@ -150,8 +182,12 @@ def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
 def parse_content(renderer: Any, content: str) -> List[Dict[str, Any]]:
     lexer = PcbDrawInlineLexer(renderer)
     processor = mistune.Markdown(renderer=renderer, inline=lexer)
-    plugin_table(processor)
-    plugin_footnotes(processor)
+    try:
+        plugin_table(processor)
+        plugin_footnotes(processor)
+    except NameError:
+        # Mistune v0.8.4 doesn't define the above functions
+        pass
     processor(content)
     return renderer.output() # type: ignore
 
@@ -281,7 +317,7 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         sys.exit(f"Missing parameter {e} either in template file or source header")
 
     if type == "html":
-        renderer = Renderer(mistune.renderers.HTMLRenderer, header.get("initial_components", [])) # type: ignore
+        renderer = Renderer(HTMLRenderer, header.get("initial_components", [])) # type: ignore
         outputfile = "index.html"
         try:
             assert template is not None
