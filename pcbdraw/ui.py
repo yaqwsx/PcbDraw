@@ -100,7 +100,7 @@ class WarningStderrReporter:
     help="Mirror the board")
 @click.option("--highlight", type=CommaList(), default=[],
     help="Comma separated list of components to highlight")
-@click.option("--filter", type=CommaList(), default=None,
+@click.option("--filter", "-f", type=CommaList(), default=None,
     help="Comma separated list of components to show, if not specified, show all")
 @click.option("--vcuts", "-v", type=KiCADLayer(), default=None,
     help="If layer specified, renders V-cuts from it")
