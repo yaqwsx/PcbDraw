@@ -15,6 +15,7 @@ from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
                        renderBoard, validateExternalPrerequisites)
 from .populate import populate
 from .pcbnew_common import fakeKiCADGui
+from .click_default_group import DefaultGroup
 
 
 class Layer(IntEnum):
@@ -81,7 +82,16 @@ class WarningStderrReporter:
         self.triggered = True
 
 
-@click.command()
+@click.group(cls=DefaultGroup, default='plot', default_if_no_args=True)
+@click.version_option(__version__)
+def run() -> None:
+    """
+    PcbDraw generates images of KiCAD PCBs
+    """
+    pass
+
+
+@run.command()
 @click.argument("input", type=click.Path(file_okay=True, dir_okay=False, exists=True))
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--style", "-s", type=str, default=None,
@@ -238,7 +248,7 @@ def processColor(c: Tuple[Optional[int], Optional[int], Optional[int]]) \
     return None
 
 
-@click.command()
+@run.command()
 @click.argument("input", type=click.Path(file_okay=True, dir_okay=False, exists=True))
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--side", type=click.Choice(["front", "back"]), default="front",
@@ -296,16 +306,7 @@ def render(input: str, output: str, side: str, renderer: str, projection: str,
             img_save_msg = "; image saved in error.png"
         raise RuntimeError(f"The following GUI error ocurred{img_save_msg}:\n{e}")
 
-@click.group()
-@click.version_option(__version__)
-def run() -> None:
-    """
-    PcbDraw generates images of KiCAD PCBs
-    """
-    pass
 
-run.add_command(render)
-run.add_command(plot)
 run.add_command(populate)
 
 if __name__ == "__main__":
