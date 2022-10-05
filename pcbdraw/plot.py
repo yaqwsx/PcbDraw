@@ -1204,6 +1204,11 @@ class PcbPlotter():
                 pass
             popt.SetTextMode(pcbnew.PLOT_TEXT_MODE_STROKE)
             for action in to_plot:
+                if len(action.layers) == 0:
+                    continue
+                # Set the filename before opening the file as KiCAD 6.0.8
+                # requires it even for the SVG format
+                pctl.SetLayer(action.layers[0])
                 pctl.OpenPlotfile(action.name, pcbnew.PLOT_FORMAT_SVG, action.name)
                 for l in action.layers:
                     pctl.SetColorMode(False)
