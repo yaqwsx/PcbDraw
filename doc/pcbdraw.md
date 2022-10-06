@@ -34,7 +34,7 @@ has the following options:
 - `--mirror` Mirror the board
 - `--highlight COMMA SEPARATED LIST` Comma separated list of component
   designators to highlight
-- `--filter COMMA SEPARATED LIST` Comma separated list of component designators
+- `-f, --filter COMMA SEPARATED LIST` Comma separated list of component designators
   to show, if not specified, show all
 - `-v, --vcuts KICAD LAYER` If layer is specified, renders V-cuts from it
 - `--resistor-values COMMA SEPARATED LIST` Comma separated colon delimited
