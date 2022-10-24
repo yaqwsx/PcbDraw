@@ -625,13 +625,15 @@ def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
             continue
         for pad in module.Pads():
             pos = pad.GetPosition()
+            drs = pad.GetDrillSize()
             holes.append(Hole(
                 position=(pos[0], pos[1]),
                 orientation=pad.GetOrientation(),
-                drillsize=(pad.GetDrillSizeX(), pad.GetDrillSizeY())
+                drillsize=(drs.x, drs.y)
             ))
+    via_type = pcbnew.VIA if not isV6(KICAD_VERSION) else pcbnew.PCB_VIA
     for track in board.GetTracks():
-        if not isinstance(track, pcbnew.PCB_VIA) or not isV6(KICAD_VERSION):
+        if not isinstance(track, via_type):
             continue
         pos = track.GetPosition()
         holes.append(Hole(
