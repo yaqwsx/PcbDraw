@@ -150,6 +150,13 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     plotter.mirror = mirror
     plotter.margin = mm2ki(margin)
 
+    # KiCAD 6 uses the default precision 6 which makes the images not
+    # displayable by common web-browsers. Lowering the precision to 5 helps.
+    # Since there's not much of a point of using lower resolution, we hard-code
+    # the resolution for UI in order to make it clean. It is, however, still
+    # configurable when it is used via via API.
+    plotter.svg_precision = 5
+
     if show_lib_paths:
         print_lib_paths(plotter)
         return 0
