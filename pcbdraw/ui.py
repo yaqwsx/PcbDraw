@@ -1,3 +1,4 @@
+import platform
 import sys
 from dataclasses import dataclass
 from enum import IntEnum
@@ -11,8 +12,6 @@ from .convert import save
 from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
                    PlotSubstrate, PlotVCuts, ResistorValue, load_remapping,
                    mm2ki)
-from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
-                       renderBoard, validateExternalPrerequisites)
 from .populate import populate
 from .pcbnew_common import fakeKiCADGui
 
@@ -274,6 +273,12 @@ def render(input: str, output: str, side: str, renderer: str, projection: str,
     """
     Create a rendered image of the PCB using KiCAD's 3D Viewer
     """
+    if platform.system() == "Windows":
+        sys.exit("Render functionality is not available on Windows.")
+
+    from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
+                       renderBoard, validateExternalPrerequisites)
+
     try:
         validateExternalPrerequisites()
 
