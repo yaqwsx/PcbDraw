@@ -532,7 +532,7 @@ def remove_inkscape_annotation(tree: etree.Element) -> None:
 @dataclass
 class Hole:
     position: Tuple[int, int]
-    orientation: int
+    orientation: pcbnew.EDA_ANGLE
     drillsize: Tuple[int, int]
 
     def get_svg_path_d(self, ki2svg: Callable[[int], float]) -> str:
@@ -588,7 +588,7 @@ def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
         pos = track.GetPosition()
         holes.append(Hole(
             position=(pos[0], pos[1]),
-            orientation=0,
+            orientation=pcbnew.EDA_ANGLE(0, pcbnew.DEGREES_T),
             drillsize=(track.GetDrillValue(), track.GetDrillValue())
         ))
     return holes
@@ -678,7 +678,7 @@ class PlotSubstrate(PlotInterface):
             el = etree.SubElement(layer, "path")
             el.attrib["d"] = hole.get_svg_path_d(self._plotter.ki2svg)
             el.attrib["transform"] = "translate({} {}) rotate({})".format(
-                position[0], position[1], -hole.orientation / 10)
+                position[0], position[1], -hole.orientation.AsDegrees())
 
     def _process_baselayer(self, name: str, source_filename: str) -> None:
         clipPath = self._plotter.get_def_slot(tag_name="clipPath", id="cut-off")
@@ -749,7 +749,7 @@ class PlotSubstrate(PlotInterface):
                 el.attrib["stroke-width"] = str(stroke)
                 el.attrib["points"] = points
                 el.attrib["transform"] = "translate({} {}) rotate({})".format(
-                    position[0], position[1], -hole.orientation / 10)
+                    position[0], position[1], -hole.orientation.AsDegrees())
 
 @dataclass
 class PlacedComponentInfo:
@@ -1068,7 +1068,7 @@ class PcbPlotter():
             value = footprint.GetValue().strip()
             ref = footprint.GetReference().strip()
             center = footprint.GetPosition()
-            orient = math.radians(footprint.GetOrientation() / 10)
+            orient = math.radians(footprint.GetOrientation().AsDegrees())
             pos = (center.x, center.y, orient)
             callback(lib, name, ref, value, pos)
 
