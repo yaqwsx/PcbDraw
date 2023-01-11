@@ -29,7 +29,7 @@ except ImportError:
 from pcbdraw.unit import read_resistance
 import svgpathtools # type: ignore
 from lxml import etree, objectify # type: ignore
-from pcbnewTransition import KICAD_VERSION, isV6, pcbnew # type: ignore
+from pcbnewTransition import KICAD_VERSION, isV6, isV7, pcbnew # type: ignore
 
 T = TypeVar("T")
 Numeric = Union[int, float]
@@ -40,6 +40,8 @@ Box = Tuple[Numeric, Numeric, Numeric, Numeric]
 PKG_BASE = os.path.dirname(__file__)
 
 etree.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+
+LEGACY_KICAD = not isV6() and not isV7()
 
 default_style = {
     "copper": "#417e5a",
@@ -581,7 +583,7 @@ def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
                 orientation=pad.GetOrientation(),
                 drillsize=(drs.x, drs.y)
             ))
-    via_type = pcbnew.VIA if not isV6(KICAD_VERSION) else pcbnew.PCB_VIA
+    via_type = pcbnew.VIA if LEGACY_KICAD else pcbnew.PCB_VIA
     for track in board.GetTracks():
         if not isinstance(track, via_type):
             continue
@@ -1013,8 +1015,8 @@ class PcbPlotter():
 
         self.yield_warning: Callable[[str, str], None] = lambda tag, msg: None # Handle warnings
 
-        self.ki2svg = self._ki2svg_v6 if isV6(KICAD_VERSION) else self._ki2svg_v5
-        self.svg2ki = self._svg2ki_v6 if isV6(KICAD_VERSION) else self._svg2ki_v5
+        self.ki2svg = self._ki2svg_v5 if LEGACY_KICAD else self._ki2svg_v6
+        self.svg2ki = self._svg2ki_v5 if LEGACY_KICAD else self._svg2ki_v6
 
     @property
     def svg_precision(self) -> int:
@@ -1192,8 +1194,10 @@ class PcbPlotter():
                 # Method does not exist in older versions of KiCad
                 pass
             popt.SetTextMode(pcbnew.PLOT_TEXT_MODE_STROKE)
-            if isV6(KICAD_VERSION):
+            if isV6():
                 popt.SetSvgPrecision(self.svg_precision, False)
+            if isV7():
+                popt.SetSvgPrecision(self.svg_precision)
             for action in to_plot:
                 if len(action.layers) == 0:
                     continue
