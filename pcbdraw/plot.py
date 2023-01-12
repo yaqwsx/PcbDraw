@@ -109,7 +109,10 @@ class SvgPathItem:
     def is_same(p1: Point, p2: Point) -> bool:
         dx = p1[0] - p2[0]
         dy = p1[1] - p2[1]
-        return math.sqrt(dx*dx+dy*dy) < 100
+        pseudo_distance = dx*dx + dy*dy
+        if isV7():
+            return pseudo_distance < 0.01 ** 2
+        return pseudo_distance < 100 ** 2
 
     def format(self, first: bool) -> str:
         ret = ""
@@ -1015,8 +1018,15 @@ class PcbPlotter():
 
         self.yield_warning: Callable[[str, str], None] = lambda tag, msg: None # Handle warnings
 
-        self.ki2svg = self._ki2svg_v5 if LEGACY_KICAD else self._ki2svg_v6
-        self.svg2ki = self._svg2ki_v5 if LEGACY_KICAD else self._svg2ki_v6
+        if isV7():
+            self.ki2svg = self._ki2svg_v7
+            self.svg2ki = self._svg2ki_v7
+        elif isV6():
+            self.ki2svg = self._ki2svg_v6
+            self.svg2ki = self._svg2ki_v6
+        else:
+            self.ki2svg = self._ki2svg_v5
+            self.svg2ki = self._svg2ki_v5
 
     @property
     def svg_precision(self) -> int:
@@ -1235,6 +1245,12 @@ class PcbPlotter():
 
     def _svg2ki_v5(self, x: float) -> int:
         return dmil2ki(x)
+
+    def _svg2ki_v7(self, x: float) -> int:
+        return int(pcbnew.FromMM(x))
+
+    def _ki2svg_v7(self, x: int) -> float:
+        return float(pcbnew.ToMM(x))
 
     def _shrink_svg(self, svg: etree.ElementTree, margin: int) -> None:
         """
