@@ -417,7 +417,7 @@ def postProcessCrop(board: Union[str, pcbnew.BOARD], verticalPadding: int,
             for rId, row in enumerate(npBoard):
                 for cId, elem in enumerate(row):
                     fPix = np.array([int(x) for x in elem])
-                    distance = np.linalg.norm(fPix - pixel)
+                    distance = np.linalg.norm(fPix - pixel) # type: ignore
                     if distance < 20:
                         ImageDraw.floodfill(board, (cId, rId), (0, 0, 0, 0), thresh=30)
 
