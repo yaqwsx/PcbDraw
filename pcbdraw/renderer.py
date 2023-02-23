@@ -25,7 +25,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from pyvirtualdisplay.smartdisplay import SmartDisplay
 
 from .pcbnew_common import findBoardBoundingBox
-from pcbnewTransition import pcbnew # type: ignore
+from pcbnewTransition import pcbnew, getVersion # type: ignore
 
 PKG_BASE = os.path.dirname(__file__)
 DEBUG_PATH = None
@@ -83,7 +83,7 @@ class PcbnewSession:
         """
         List currently active windows, return mapping "Title -> id"
         """
-        windows = self._xdotool(["search", "--pid", self._process.pid])
+        windows = self._xdotool(["search", "--pid", self._process.pid, ".*"])
         res = {}
         for winId in windows:
             name = self._xdotool(["getwindowname", winId])
@@ -225,6 +225,9 @@ class ViewerSession:
         # We have to wait for board processing, we try to open preferences
         # and then close it. The safest seems to open the menu as it is
         # not locale dependent
+
+        # KiCAD 7 doesn't like when keystrokes are send too quickly
+        time.sleep(1)
         self._sendKeys(["alt+p", "Down", "Return"])
         prefId = self._parent.waitForWindow("Preferences")
         self._parent._xdotool(["key", "--window", prefId, "Escape"])
@@ -234,20 +237,20 @@ class ViewerSession:
     def showFront(self) -> None:
         self._sendKeys(["z"])
         time.sleep(0.5)
-        self._parent.waitForImmovable(threshold=20)
+        self._parent.waitForImmovable(threshold=3)
 
     def showBack(self) -> None:
         self._sendKeys(["Shift+z"])
         time.sleep(0.5)
-        self._parent.waitForImmovable(threshold=20)
+        self._parent.waitForImmovable(threshold=3)
 
     def toggleAxisIndicator(self) -> None:
         self._sendKeys(["alt+p"] + 6 * ["Down"] + ["Return"])
-        self._parent.waitForImmovable(threshold=20)
+        self._parent.waitForImmovable(threshold=3)
 
     def toggleComponents(self) -> None:
         self._sendKeys(["T", "S", "V"])
-        self._parent.waitForImmovable(threshold=20)
+        self._parent.waitForImmovable(threshold=3)
 
     def captureRaytraced(self, withComponents: bool=True) -> Image.Image:
         if not withComponents:
@@ -266,6 +269,7 @@ class ViewerSession:
     def toggleOrthographic(self) -> None:
         # There is no shortcut...
         self._click((676, 44))
+        self._parent.waitForImmovable(threshold=3)
 
     def _rotate(self, angle: int, plusButton: Tuple[int, int],
                 minusButton: Tuple[int, int]) -> None:
@@ -329,7 +333,8 @@ def startPcbnewSession(resolution: Tuple[int, int]=(3000, 3000),
                 # to produce consistent results, we provide a new KiCAD config
                 # that is a copy of the original and the crucial files are
                 # replaced with pristine ones.
-                kicadConfigDir = os.path.join(tempdir, "6.0")
+                kicadVersion = getVersion()
+                kicadConfigDir = os.path.join(tempdir, f"{kicadVersion[0]}.{kicadVersion[1]}")
                 duplicateKiCadSettings(kicadConfigDir)
                 shutil.copy(os.path.join(PKG_BASE, "resources", "defaultKiCadSettings", "3d_viewer.json"),
                             os.path.join(kicadConfigDir, "3d_viewer.json"))
