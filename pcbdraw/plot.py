@@ -572,6 +572,9 @@ class ResistorValue:
     value: Optional[str] = None
     flip_bands: bool=False
 
+@dataclass
+class RotationValue:
+    value: Optional[str] = None
 
 def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
     holes: List[Hole] = [] # Tuple: position, orientation, drillsize
@@ -769,6 +772,7 @@ class PlotComponents(PlotInterface):
     filter: Callable[[str], bool] = lambda x: True # Components to show
     highlight: Callable[[str], bool] = lambda x: False # References to highlight
     remapping: Callable[[str, str, str], Tuple[str, str]] = lambda ref, lib, name: (lib, name)
+    rotation_values: Dict[str, RotationValue] = field(default_factory=dict)
     resistor_values: Dict[str, ResistorValue] = field(default_factory=dict)
 
     def render(self, plotter: PcbPlotter) -> None:
@@ -805,7 +809,7 @@ class PlotComponents(PlotInterface):
         else:
             ret = self._create_component(lib, name, ref, value)
             if ret is None:
-                self._plotter.yield_warning("component", f"Component {lib}:{name} has not footprint.")
+                self._plotter.yield_warning("component", f"Component \"{ref}\" {lib}:{name} has no footprint.")
                 return
             component_element, component_info = ret
             self._used_components[unique_name] = component_info
@@ -814,10 +818,19 @@ class PlotComponents(PlotInterface):
         group = etree.Element("g")
         group.append(component_element)
         ci = component_info
+
+        rotation = -math.degrees(position[2])
+
+        # Override rotation values
+        if ref in self.rotation_values:
+            v = self.rotation_values[ref].value
+            if v is not None:
+                rotation = v
+
         group.attrib["transform"] = \
             f"translate({self._plotter.ki2svg(position[0])} {self._plotter.ki2svg(position[1])}) " + \
             f"scale({ci.scale[0]}, {ci.scale[1]}) " + \
-            f"rotate({-math.degrees(position[2])}) " + \
+            f"rotate({rotation}) " + \
             f"translate({-ci.origin[0]} {-ci.origin[1]})"
         self._plotter.append_component_element(group)
 
