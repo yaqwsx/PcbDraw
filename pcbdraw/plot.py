@@ -609,6 +609,7 @@ class PlotInterface:
 @dataclass
 class PlotSubstrate(PlotInterface):
     drill_holes: bool = True
+    copper: bool = True
     outline_width: int = mm2ki(0.1)
 
     def render(self, plotter: PcbPlotter) -> None:
@@ -619,22 +620,24 @@ class PlotSubstrate(PlotInterface):
             to_plot = [
                 PlotAction("board", [pcbnew.Edge_Cuts], self._process_baselayer),
                 PlotAction("clad", [pcbnew.B_Mask], self._process_layer),
-                PlotAction("copper", [pcbnew.B_Cu], self._process_layer),
                 PlotAction("pads", [pcbnew.B_Cu], self._process_layer),
                 PlotAction("pads-mask", [pcbnew.B_Mask], self._process_mask),
                 PlotAction("silk", [pcbnew.B_SilkS], self._process_layer),
                 PlotAction("outline", [pcbnew.Edge_Cuts], self._process_outline)
             ]
+            if self.copper:
+                to_plot.insert(2, PlotAction("copper", [pcbnew.B_Cu], self._process_layer))
         else:
             to_plot = [
                 PlotAction("board", [pcbnew.Edge_Cuts], self._process_baselayer),
                 PlotAction("clad", [pcbnew.F_Mask], self._process_layer),
-                PlotAction("copper", [pcbnew.F_Cu], self._process_layer),
                 PlotAction("pads", [pcbnew.F_Cu], self._process_layer),
                 PlotAction("pads-mask", [pcbnew.F_Mask], self._process_mask),
                 PlotAction("silk", [pcbnew.F_SilkS], self._process_layer),
                 PlotAction("outline", [pcbnew.Edge_Cuts], self._process_outline)
             ]
+            if self.copper:
+                to_plot.insert(2, PlotAction("copper", [pcbnew.F_Cu], self._process_layer))
 
         self._container = etree.Element("g", id="substrate")
         self._container.attrib["clip-path"] = "url(#cut-off)"
