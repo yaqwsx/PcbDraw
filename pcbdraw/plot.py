@@ -885,9 +885,18 @@ class PlotComponents(PlotInterface):
             width=str(self._plotter.ki2svg(int(info.size[0] + 2 * padding))),
             height=str(self._plotter.ki2svg(int(info.size[1] + 2 * padding))),
             style=self._plotter.get_style("highlight-style"))
+        
+        rotation = -math.degrees(position[2])
+
+        # Override rotation values
+        if ref in self.rotation_values:
+            v = self.rotation_values[ref].value
+            if v is not None:
+                rotation = v
+
         h.attrib["transform"] = \
             f"translate({self._plotter.ki2svg(position[0])} {self._plotter.ki2svg(position[1])}) " + \
-            f"rotate({-math.degrees(position[2])}) " + \
+            f"rotate({rotation}) " + \
             f"translate({-(info.origin[0] - info.svg_offset[0]) * info.scale[0]}, {-(info.origin[1] - info.svg_offset[1]) * info.scale[1]})"
         self._plotter.append_highlight_element(h)
 
