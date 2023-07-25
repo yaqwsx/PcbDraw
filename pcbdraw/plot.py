@@ -929,6 +929,11 @@ class PlotComponents(PlotInterface):
                 if t_string.strip() not in s:
                     raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
                 tolerance = t_string
+            else:
+                try:
+                    res = read_resistance(value)
+                except ValueError:
+                    raise UserWarning(f"Invalid resistor value {value}")
         return res, tolerance
 
 
