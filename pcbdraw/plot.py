@@ -1183,7 +1183,7 @@ class PcbPlotter():
                     value = value[key]
                 return value
             except KeyError as e:
-                raise e from None
+                raise UserWarning(f"Invalid argument for get_style : {args[0]}, {args[1]}")
 
     def execute_plot_plan(self, to_plot: List[PlotAction]) -> None:
         """
