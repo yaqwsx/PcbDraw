@@ -57,6 +57,8 @@ default_style = {
     "highlight-padding": 1.5,
     "highlight-offset": 0,
     "tht-resistor-band-colors": {
+        -2: '#d9d9d9',
+        -1: '#ffc800',
         0: '#000000',
         1: '#805500',
         2: '#ff0000',
@@ -884,7 +886,7 @@ class PlotComponents(PlotInterface):
         try:
             res, tolerance = self._get_resistance_from_value(value)
             power = math.floor(res.log10()) - 1
-            res = Decimal(int(res / 10 ** power))
+            res = Decimal(int(float(res) / 10 ** power))
             resistor_colors = [
                 self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
                 self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
