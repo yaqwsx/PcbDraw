@@ -1272,7 +1272,19 @@ class PcbPlotter():
         from xml.etree.ElementTree import fromstring as xmlParse
 
         from lxml.etree import tostring as serializeXml # type: ignore
-        paths = svgpathtools.document.flattened_paths(xmlParse(serializeXml(svg)))
+        tree = xmlParse(serializeXml(svg))
+
+        # As we cannot interpret mask cropping, we cannot simply take all paths
+        # from source document (as e.g., silkscreen outside PCB) would enlarge
+        # the canvas. Instead, we take bounding box of the substrate and
+        # components separately
+        paths = []
+        components = tree.find(".//*[@id='componentContainer']")
+        if components is not None:
+            paths += svgpathtools.document.flattened_paths(components)
+        substrate = tree.find(".//*[@id='cut-off']")
+        if substrate is not None:
+            paths += svgpathtools.document.flattened_paths(substrate)
 
         if len(paths) == 0:
             return
