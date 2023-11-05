@@ -23,6 +23,7 @@ def buildFootprintBoardFromFile(footprintPath: str) -> pcbnew.BOARD:
 
     board = pcbnew.BOARD()
     footprint.SetPosition(pcbnew.VECTOR2I(0, 0))
+    footprint.SetOrientationDegrees(0)
     footprint.Reference().SetVisible(False)
     footprint.Value().SetVisible(False)
     board.Add(footprint)
@@ -41,6 +42,7 @@ def buildFootprintBoardFromFootprint(footprint: pcbnew.FOOTPRINT) -> pcbnew.BOAR
     if newFootprint.GetLayer() == pcbnew.B_Cu:
         newFootprint.Flip(pcbnew.VECTOR2I(0, 0), True)
     newFootprint.SetPosition(pcbnew.VECTOR2I(0, 0))
+    newFootprint.SetOrientationDegrees(0)
     board.Add(newFootprint)
     return board
 
