@@ -1004,12 +1004,12 @@ class PcbPlotter():
     mainly serves as a builder (to step-by-step specify all options) and also to
     avoid passing many arguments between auxiliary functions
     """
-    def __init__(self, boardFile: str):
+    def __init__(self, board: Union[str, pcbnew.BOARD]):
         self._unique_counter: int = 1
         try:
-            self.board: pcbnew.BOARD = pcbnew.LoadBoard(boardFile)
+            self.board: pcbnew.BOARD = board if isinstance(board, pcbnew.BOARD) else pcbnew.LoadBoard(board)
         except IOError:
-            raise IOError(f"Cannot open board '{boardFile}'") from None
+            raise IOError(f"Cannot open board '{board}'") from None
         self.render_back: bool = False
         self.mirror: bool = False
         self.plot_plan: List[PlotInterface] = [

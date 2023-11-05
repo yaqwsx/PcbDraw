@@ -7,6 +7,8 @@ from typing import Tuple, Optional, Any, List
 import click
 from PIL import Image
 
+from .create_template import libtemplate
+
 from . import __version__
 from .convert import save
 from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
@@ -322,6 +324,7 @@ def run() -> None:
 run.add_command(render)
 run.add_command(plot)
 run.add_command(populate)
+run.add_command(libtemplate)
 
 if __name__ == "__main__":
     run()
