@@ -1,3 +1,4 @@
+import sys
 from pcbnewTransition import pcbnew, isV6 # type: ignore
 from pcbnewTransition.pcbnew import BOX2I # type: ignore
 from itertools import chain
@@ -60,6 +61,11 @@ def fakeKiCADGui() -> Optional[wx.App]:
     if os.name != "nt" and os.environ.get("DISPLAY", "").strip() == "":
         return None
 
-    app = wx.App()
-    app.InitLocale()
-    return app
+    sys.stdout = os.fdopen(os.dup(1), "w")
+    sys.stderr = os.fdopen(os.dup(2), "w")
+
+    os.dup2(os.open(os.devnull,os.O_RDWR), 1)
+    os.dup2(os.open(os.devnull,os.O_RDWR), 2)
+
+    return None
+
