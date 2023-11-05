@@ -10,8 +10,8 @@ from PIL import Image
 from . import __version__
 from .convert import save
 from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
-                   PlotSubstrate, PlotVCuts, ResistorValue, load_remapping,
-                   mm2ki)
+                   PlotSubstrate, PlotVCuts, ResistorValue, RotationValue,
+                   load_remapping, mm2ki)
 from .populate import populate
 from .pcbnew_common import fakeKiCADGui
 
@@ -115,6 +115,8 @@ class WarningStderrReporter:
     help="Comma separated list of resistor value remapping. For example, \"R1:10k,R2:470\"")
 @click.option("--resistor-flip", type=CommaList(), default=[],
     help="Comma separated list of resistor bands to flip")
+@click.option("--rotation-values", type=CommaList(), default=[],
+    help="Comma separated list of rotation value remapping. For example, \"R1:90,R2:270\"")
 @click.option("--paste", is_flag=True,
     help="Add paste layer")
 @click.option("--components/--no-components", default=True,
@@ -127,8 +129,8 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
          placeholders: bool, remap: str, drill_holes: bool, side: str,
          mirror: bool, highlight: List[str], filter: Optional[List[str]],
          vcuts: bool, dpi: int, margin: float, silent: bool, werror: bool,
-         resistor_values: List[str], resistor_flip: List[str], components: bool,
-         paste: bool, outline_width: float, show_lib_paths: bool) -> int:
+         resistor_values: List[str], resistor_flip: List[str], rotation_values: List[str],
+         components: bool, paste: bool, outline_width: float, show_lib_paths: bool) -> int:
     """
     Create a stylized drawing of the PCB.
     """
@@ -173,7 +175,8 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
 
     if components:
         plotter.plot_plan.append(
-            build_plot_components(remap, highlight, filter, resistor_flip, resistor_values))
+            build_plot_components(remap, highlight, filter, resistor_flip, resistor_values,
+            rotation_values))
     if placeholders:
         plotter.plot_plan.append(PlotPlaceholders())
 
@@ -186,9 +189,10 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     return 0
 
 def build_plot_components(remap: str, highlight: List[str], filter: Optional[List[str]],
-                          resistor_flip: List[str], resistor_values_input: List[str]) \
-                          -> PlotComponents:
+                          resistor_flip: List[str], resistor_values_input: List[str],
+                          rotation_values_input: List[str]) -> PlotComponents:
     remapping = load_remapping(remap)
+
     def remapping_fun(ref: str, lib: str, name: str) -> Tuple[str, str]:
         if ref in remapping:
             remapped_lib, remapped_name = remapping[ref]
@@ -207,8 +211,14 @@ def build_plot_components(remap: str, highlight: List[str], filter: Optional[Lis
         field.flip_bands = True
         resistor_values[ref] = field
 
+    rotation_values = {}
+    for mapping in rotation_values_input:
+        key, value = tuple(mapping.split(":"))
+        rotation_values[key] = RotationValue(value=value)
+
     plot_components = PlotComponents(
         remapping=remapping_fun,
+        rotation_values=rotation_values,
         resistor_values=resistor_values)
 
     if filter is not None:
