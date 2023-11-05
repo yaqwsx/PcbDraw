@@ -810,7 +810,7 @@ class PlotComponents(PlotInterface):
         else:
             ret = self._create_component(lib, name, ref, value)
             if ret is None:
-                self._plotter.yield_warning("component", f"Component {lib}:{name} has not footprint.")
+                self._plotter.yield_warning("component", f"Component {lib}:{name} has no footprint.")
                 return
             component_element, component_info = ret
             self._used_components[unique_name] = component_info
