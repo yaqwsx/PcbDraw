@@ -891,12 +891,12 @@ class PlotComponents(PlotInterface):
             if res < 0.001:
                 raise UserWarning("resistance too small to represent")
 
-            if float(tolerance[:-1]) <= 2:
+            if float(tolerance[:-1]) > 2:
                 power = math.floor(res.log10())
                 if res >= 10:
                     power -= 1
                 res = Decimal(int(float(res) / 10 ** power))
-                res = "{:03f}".format(res)
+                res = "{:02f}".format(res)
                 resistor_colors = [
                     self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
                     self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
