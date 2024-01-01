@@ -57,6 +57,7 @@ default_style = {
     "highlight-padding": 1.5,
     "highlight-offset": 0,
     "tht-resistor-band-colors": {
+        -3: '#d8a0a6',
         -2: '#d9d9d9',
         -1: '#ffc800',
         0: '#000000',
@@ -69,14 +70,17 @@ default_style = {
         7: '#cc00cc',
         8: '#666666',
         9: '#cccccc',
+        # resistor tolerances
+        '10%': '#d9d9d9',
+        '5%': '#ffc800',
         '1%': '#805500',
         '2%': '#ff0000',
+        '0.05%': '#ff8000',
+        '0.02%': '#ffff00',
         '0.5%': '#00cc11',
         '0.25%': '#0000cc',
         '0.1%': '#cc00cc',
-        '0.05%': '#666666',
-        '5%': '#ffc800',
-        '10%': '#d9d9d9',
+        '0.01%': '#666666',
     }
 }
 
@@ -884,32 +888,48 @@ class PlotComponents(PlotInterface):
         self._plotter.append_highlight_element(h)
 
     def _apply_resistor_code(self, root: etree.Element, id_prefix: str, ref: str, value: str, properties: Dict[str, str]) -> None:
-        if root.find(f".//*[@id='{id_prefix}res_4band1']") is None:
+        if root.find(f".//*[@id='{id_prefix}res_band1']") is None:
             return
         try:
             res, tolerance = self._get_resistance_from_value(value, properties)
+            if res == 0:        # if exactly 0, un-hide the zero band mark
+                band = root.find(f".//*[@id='{id_prefix}res_zeroband']")
+                s = band.attrib["style"].split(";")
+                for i in range(len(s)):
+                    if s[i].startswith('display:'):
+                        s_split = s[i].split(':')
+                        s_split[1] = 'inline'
+                        s[i] = ':'.join(s_split)
+                band.attrib["style"] = ";".join(s)
+                return
             if res < 0.001:
-                raise UserWarning("resistance too small to represent")
+                raise UserWarning(f"resistance too small to represent ({res})")
 
+            print(ref, res, tolerance)
+
+            # if more than 2%, then a 4 color band. otherwise a 5 color band
+            res_orig = res
             if float(tolerance[:-1]) > 2:
                 power = math.floor(res.log10())
-                if res >= 10:
-                    power -= 1
                 res = Decimal(int(float(res) / 10 ** power))
+                if res < 10:
+                    power -= 1
+                res = Decimal(int(float(res_orig) / 10 ** power))
                 res = "{:02f}".format(res)
                 resistor_colors = [
                     self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
                     self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
                     self._plotter.get_style("tht-resistor-band-colors", int(power))
                 ]
-                r_band = '4'
+                r_band = ''     # the svg doesn't have a prefix to keep backwards compatibility
             else:
                 power = math.floor(res.log10())
-                if res >= 100:
-                    power -= 2
-                elif res >= 10:
-                    power -= 1
                 res = Decimal(int(float(res) / 10 ** power))
+                if res < 10:
+                    power -= 2
+                elif res < 100:
+                    power -= 1
+                res = int(float(res_orig / Decimal(10 ** power)))
                 res = "{:03f}".format(res)
                 resistor_colors = [
                     self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
@@ -918,6 +938,9 @@ class PlotComponents(PlotInterface):
                     self._plotter.get_style("tht-resistor-band-colors", int(power))
                 ]
                 r_band = '5'
+
+            # safety check, to ensure the new resistor times power is the same as a truncated version of the original
+            assert math.isclose(float(res_orig), float(res)*10**power, rel_tol=10**power)
 
             if tolerance != '20%':
                 resistor_colors += [self._plotter.get_style("tht-resistor-band-colors", tolerance)]
@@ -946,6 +969,7 @@ class PlotComponents(PlotInterface):
     def _get_resistance_from_value(self, value: str, properties: Dict[str, str]) -> Tuple[Decimal, str]:
         res, tolerance = None, "5%"
         value_l = value.split(" ", maxsplit=1)
+        print(value)
         try:
             res = read_resistance(value_l[0])
         except ValueError:
@@ -972,7 +996,7 @@ class PlotComponents(PlotInterface):
             if not isinstance(s, dict):
                 raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
             if t_string.strip() not in s:
-                raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
+                raise UserWarning(f"Tolerance does not exist in style: {t_string}")
             tolerance = t_string
 
         return res, tolerance
