@@ -23,9 +23,28 @@ from .plot import find_data_file, get_global_datapaths
 PKG_BASE = os.path.dirname(__file__)
 
 def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any=None) -> Any:
+    """The rule given to mistune to parse out the desired variables (side and component)"""
     text = m.group(1)
     side, components = text.split("|")
     components = list(map(lambda x: x.strip(), components.split(",")))
+    for i in reversed(range(len(components))):
+        c = components[i]
+        if c.count('-') == 1:   # if we have a - for a range (for example R3-R9)
+            m = re.match(r'(\w*?)(\d+)-(\w*?)(\d+)$', c)
+            try:
+                prefix = m.group(1)
+                if prefix != m.group(3):    # if the first and second prefix don't match, ignore
+                    continue
+                start_n = int(m.group(2))
+                end_n = int(m.group(4))
+            except (IndexError, ValueError):
+                # if we either didn't have a full regex match, or the numbers weren't integers somehow?
+                continue
+            if start_n > end_n:     # check that the first number is the lower limit (R6-R2 is not valid)
+                continue
+            # Replace XY-XZ with [XY, X(Y+1), X(Y+2), ..., X(Z-1), ZX]
+            components += [f"{prefix}{i}" for i in range(start_n, end_n+1)]
+            components.pop(i)
     return 'pcbdraw', side, components
 
 class PcbDrawInlineLexer(InlineParser): # type: ignore
@@ -232,11 +251,13 @@ def generate_image(boardfilename: str, side: str, components: List[str],
     plot_args += ["--filter", ",".join(components)]
     plot_args += ["--highlight", ",".join(active)]
     plot_args += [boardfilename, outputfile]
+    tmp_std = sys.stdout        # make a copy of stdout
     try:
         plot.main(args=plot_args)
     except SystemExit as e:
         if e.code is not None and e.code != 0:
             raise e from None
+    sys.stdout = tmp_std
 
 def get_data_path() -> List[str]:
     paths: List[str] = []
