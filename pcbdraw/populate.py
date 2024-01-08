@@ -30,13 +30,15 @@ def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any=None) -> Any:
     for i in reversed(range(len(components))):
         c = components[i]
         if c.count('-') == 1:   # if we have a - for a range (for example R3-R9)
-            m = re.match(r'(\w*?)(\d+)-(\w*?)(\d+)$', c)
+            s_m = re.match(r'(\w*?)(\d+)-(\w*?)(\d+)$', c)
+            if s_m is None:
+                continue
             try:
-                prefix = m.group(1)
-                if prefix != m.group(3):    # if the first and second prefix don't match, ignore
+                prefix = s_m.group(1)
+                if prefix != s_m.group(3):    # if the first and second prefix don't match, ignore
                     continue
-                start_n = int(m.group(2))
-                end_n = int(m.group(4))
+                start_n = int(s_m.group(2))
+                end_n = int(s_m.group(4))
             except (IndexError, ValueError):
                 # if we either didn't have a full regex match, or the numbers weren't integers somehow?
                 continue
