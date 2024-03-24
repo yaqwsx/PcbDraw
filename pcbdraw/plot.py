@@ -29,7 +29,7 @@ except ImportError:
 from pcbdraw.unit import read_resistance
 import svgpathtools # type: ignore
 from lxml import etree, objectify # type: ignore
-from pcbnewTransition import KICAD_VERSION, isV6, isV7, pcbnew # type: ignore
+from pcbnewTransition import KICAD_VERSION, isV6, isV7, isV8, pcbnew # type: ignore
 
 T = TypeVar("T")
 Numeric = Union[int, float]
@@ -41,7 +41,7 @@ PKG_BASE = os.path.dirname(__file__)
 
 etree.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
-LEGACY_KICAD = not isV6() and not isV7()
+LEGACY_KICAD = not isV6() and not isV7() and not isV8()
 
 default_style = {
     "copper": "#417e5a",
