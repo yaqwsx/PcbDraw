@@ -10,21 +10,13 @@ from itertools import chain
 from typing import List, Optional, Any, Tuple, Dict
 
 import click
-import mistune # type: ignore
-# The following try-catch is used to support mistune 0.8.4 and 2.x
-try:
-    from mistune.plugins.table import plugin_table # type: ignore
-    from mistune.plugins.footnotes import plugin_footnotes # type: ignore
-    InlineParser = mistune.inline_parser.InlineParser
-    HTMLRenderer = mistune.renderers.HTMLRenderer
-except ModuleNotFoundError:
-    InlineParser = mistune.InlineLexer
-    HTMLRenderer = mistune.Renderer
 import pybars # type: ignore
 import yaml
 
 import pcbdraw.mdrenderer
 
+from .mistune_shim import mistune  # type: ignore
+from .mistune_shim import (HTMLRenderer, InlineParser, plugin_footnotes,
 from .pcbnew_common import fakeKiCADGui
 from .plot import find_data_file, get_global_datapaths
 
@@ -182,12 +174,8 @@ def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
 def parse_content(renderer: Any, content: str) -> List[Dict[str, Any]]:
     lexer = PcbDrawInlineLexer(renderer)
     processor = mistune.Markdown(renderer=renderer, inline=lexer)
-    try:
-        plugin_table(processor)
-        plugin_footnotes(processor)
-    except NameError:
-        # Mistune v0.8.4 doesn't define the above functions
-        pass
+    plugin_table(processor)
+    plugin_footnotes(processor)
     processor(content)
     return renderer.output() # type: ignore
 

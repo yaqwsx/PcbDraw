@@ -26,7 +26,7 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "lxml",
-        "mistune>=2.0.2, <=2.0.5",
+        "mistune>=2.0.2",
         "pybars3",
         "pyyaml",
         "svgpathtools==1.4.1",
