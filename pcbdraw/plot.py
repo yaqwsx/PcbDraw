@@ -57,6 +57,7 @@ default_style = {
     "highlight-padding": 1.5,
     "highlight-offset": 0,
     "tht-resistor-band-colors": {
+        -3: '#d8a0a6',
         -2: '#d9d9d9',
         -1: '#ffc800',
         0: '#000000',
@@ -69,14 +70,17 @@ default_style = {
         7: '#cc00cc',
         8: '#666666',
         9: '#cccccc',
+        # resistor tolerances
+        '10%': '#d9d9d9',
+        '5%': '#ffc800',
         '1%': '#805500',
         '2%': '#ff0000',
+        '0.05%': '#ff8000',
+        '0.02%': '#ffff00',
         '0.5%': '#00cc11',
         '0.25%': '#0000cc',
         '0.1%': '#cc00cc',
-        '0.05%': '#666666',
-        '5%': '#ffc800',
-        '10%': '#d9d9d9',
+        '0.01%': '#666666',
     }
 }
 
@@ -789,11 +793,11 @@ class PlotComponents(PlotInterface):
         return f"{self._prefix}_{lib}__{name}_{value}"
 
     def _append_back_component(self, lib: str, name: str, ref: str, value: str,
-                          position: Tuple[int, int, float]) -> None:
-        return self._append_component(lib, name + ".back", ref, value, position)
+                          position: Tuple[int, int, float], properties: Dict[str, str]) -> None:
+        return self._append_component(lib, name + ".back", ref, value, position, properties)
 
     def _append_component(self, lib: str, name: str, ref: str, value: str,
-                          position: Tuple[int, int, float]) -> None:
+                          position: Tuple[int, int, float], properties: Dict[str, str]) -> None:
         if not self.filter(ref) or name == "":
             return
         # Override resistor values
@@ -810,7 +814,7 @@ class PlotComponents(PlotInterface):
             component_element = etree.Element("use",
                 attrib={"{http://www.w3.org/1999/xlink}href": "#" + component_info.id})
         else:
-            ret = self._create_component(lib, name, ref, value)
+            ret = self._create_component(lib, name, ref, value, properties)
             if ret is None:
                 self._plotter.yield_warning("component", f"Component {lib}:{name} has no footprint.")
                 return
@@ -831,7 +835,7 @@ class PlotComponents(PlotInterface):
         if self.highlight(ref):
             self._build_highlight(ref, component_info, position)
 
-    def _create_component(self, lib: str, name: str, ref: str, value: str) \
+    def _create_component(self, lib: str, name: str, ref: str, value: str, properties: Dict[str, str]) \
                              -> Optional[Tuple[etree.Element, PlacedComponentInfo]]:
         f = self._plotter._get_model_file(lib, name)
         if f is None:
@@ -860,7 +864,7 @@ class PlotComponents(PlotInterface):
             scale=(svg_scale_x, svg_scale_y),
             size=(to_kicad_basic_units(svg_tree.attrib["width"]), to_kicad_basic_units(svg_tree.attrib["height"]))
         )
-        self._apply_resistor_code(component_element, id_prefix, ref, value)
+        self._apply_resistor_code(component_element, id_prefix, ref, value, properties)
         return component_element, component_info
 
     def _component_to_board_scale_and_offset(self, svg: etree.Element) \
@@ -885,26 +889,70 @@ class PlotComponents(PlotInterface):
             f"translate({-(info.origin[0] - info.svg_offset[0]) * info.scale[0]}, {-(info.origin[1] - info.svg_offset[1]) * info.scale[1]})"
         self._plotter.append_highlight_element(h)
 
-    def _apply_resistor_code(self, root: etree.Element, id_prefix: str, ref: str, value: str) -> None:
+    def _apply_resistor_code(self, root: etree.Element, id_prefix: str, ref: str, value: str, properties: Dict[str, str]) -> None:
         if root.find(f".//*[@id='{id_prefix}res_band1']") is None:
             return
         try:
-            res, tolerance = self._get_resistance_from_value(value)
-            power = math.floor(res.log10()) - 1
-            res = Decimal(int(float(res) / 10 ** power))
-            resistor_colors = [
-                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
-                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
-                self._plotter.get_style("tht-resistor-band-colors", int(power)),
-                self._plotter.get_style("tht-resistor-band-colors", tolerance)
-            ]
+            res, tolerance = self._get_resistance_from_value(value, properties)
+            if res == 0:        # if exactly 0, un-hide the zero band mark
+                band = root.find(f".//*[@id='{id_prefix}res_zeroband']")
+                s = band.attrib["style"].split(";")
+                for i in range(len(s)):
+                    if s[i].startswith('display:'):
+                        s_split = s[i].split(':')
+                        s_split[1] = 'inline'
+                        s[i] = ':'.join(s_split)
+                band.attrib["style"] = ";".join(s)
+                return
+            if res < 0.001:
+                raise UserWarning(f"resistance too small to represent ({res})")
+
+            print(ref, res, tolerance)
+
+            # if more than 2%, then a 4 color band. otherwise a 5 color band
+            res_orig = res
+            if float(tolerance[:-1]) > 2:
+                power = math.floor(res.log10())
+                res = Decimal(int(float(res) / 10 ** power))
+                if res < 10:
+                    power -= 1
+                res = Decimal(int(float(res_orig) / 10 ** power))
+                res = "{:02f}".format(res)
+                resistor_colors = [
+                    self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
+                    self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
+                    self._plotter.get_style("tht-resistor-band-colors", int(power))
+                ]
+                r_band = ''     # the svg doesn't have a prefix to keep backwards compatibility
+            else:
+                power = math.floor(res.log10())
+                res = Decimal(int(float(res) / 10 ** power))
+                if res < 10:
+                    power -= 2
+                elif res < 100:
+                    power -= 1
+                res = int(float(res_orig / Decimal(10 ** power)))
+                res = "{:03f}".format(res)
+                resistor_colors = [
+                    self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
+                    self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
+                    self._plotter.get_style("tht-resistor-band-colors", int(str(res)[2])),
+                    self._plotter.get_style("tht-resistor-band-colors", int(power))
+                ]
+                r_band = '5'
+
+            # safety check, to ensure the new resistor times power is the same as a truncated version of the original
+            assert math.isclose(float(res_orig), float(res)*10**power, rel_tol=10**power)
+
+            if tolerance != '20%':
+                resistor_colors += [self._plotter.get_style("tht-resistor-band-colors", tolerance)]
 
             if ref in self.resistor_values:
                 if self.resistor_values[ref].flip_bands:
                     resistor_colors.reverse()
 
             for res_i, res_c in enumerate(resistor_colors):
-                band = root.find(f".//*[@id='{id_prefix}res_band{res_i+1}']")
+                band = root.find(f".//*[@id='{id_prefix}res_{r_band}band{res_i+1}']")
                 s = band.attrib["style"].split(";")
                 for i in range(len(s)):
                     if s[i].startswith('fill:'):
@@ -920,27 +968,39 @@ class PlotComponents(PlotInterface):
             self._plotter.yield_warning("resistor", f"Cannot color-code resistor {ref}: {e}")
             return
 
-    def _get_resistance_from_value(self, value: str) -> Tuple[Decimal, str]:
+    def _get_resistance_from_value(self, value: str, properties: Dict[str, str]) -> Tuple[Decimal, str]:
         res, tolerance = None, "5%"
         value_l = value.split(" ", maxsplit=1)
+        print(value)
         try:
             res = read_resistance(value_l[0])
         except ValueError:
             raise UserWarning(f"Invalid resistor value {value_l[0]}")
-        if len(value_l) > 1:
+
+        if 'tol' in properties:
+            t_string = properties['tol']
+        elif 'tolerance' in properties:
+            t_string = properties['tolerance']
+        elif len(value_l) > 1:
             t_string = value_l[1].strip().replace(" ", "")
-            if "%" in t_string:
-                s = self._plotter.get_style("tht-resistor-band-colors")
-                if not isinstance(s, dict):
-                    raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
-                if t_string.strip() not in s:
-                    raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
-                tolerance = t_string
-            else:
+            if "%" not in t_string:
+                t_string = None
+                # if the second portion is not a percentage, then just parse the whole value as it is
                 try:
                     res = read_resistance(value)
                 except ValueError:
                     raise UserWarning(f"Invalid resistor value {value}")
+        else:
+            t_string = None
+
+        if t_string is not None:
+            s = self._plotter.get_style("tht-resistor-band-colors")
+            if not isinstance(s, dict):
+                raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
+            if t_string.strip() not in s:
+                raise UserWarning(f"Tolerance does not exist in style: {t_string}")
+            tolerance = t_string
+
         return res, tolerance
 
 
@@ -951,7 +1011,7 @@ class PlotPlaceholders(PlotInterface):
         plotter.walk_components(invert_side=False, callback=self._append_placeholder)
 
     def _append_placeholder(self, lib: str, name: str, ref: str, value: str,
-                          position: Tuple[int, int, float]) -> None:
+                          position: Tuple[int, int, float], properties: Dict[str, str] = None) -> None:
         p = etree.Element("rect",
             x=str(self._plotter.ki2svg(position[0] - mm2ki(0.5))),
             y=str(self._plotter.ki2svg(position[1] - mm2ki(0.5))),
@@ -1071,7 +1131,7 @@ class PcbPlotter():
 
 
     def walk_components(self, invert_side: bool,
-            callback: Callable[[str, str, str, str, Tuple[int, int, float]], None]) -> None:
+            callback: Callable[[str, str, str, str, Tuple[int, int, float], Dict[str, str]], None]) -> None:
         """
         Invokes callback on all components in the board. The callback takes:
         - library name of the component
@@ -1094,7 +1154,8 @@ class PcbPlotter():
             center = footprint.GetPosition()
             orient = math.radians(footprint.GetOrientation().AsDegrees())
             pos = (center.x, center.y, orient)
-            callback(lib, name, ref, value, pos)
+            props = {str(i): v for i, v in dict(footprint.GetPropertiesNative()).items()}
+            callback(lib, name, ref, value, pos, props)
 
     def get_def_slot(self, tag_name: str, id: str) -> etree.SubElement:
         """

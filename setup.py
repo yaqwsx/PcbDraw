@@ -25,7 +25,7 @@ setuptools.setup(
     ],
     install_requires=[
         "numpy",
-        "lxml",
+        "lxml==4.9.4",
         "mistune>=2.0.2, <=2.0.5",
         "pybars3",
         "pyyaml",
