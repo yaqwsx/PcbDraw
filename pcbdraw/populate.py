@@ -16,7 +16,7 @@ import yaml
 import pcbdraw.mdrenderer
 
 from .mistune_shim import mistune  # type: ignore
-from .mistune_shim import (HTMLRenderer, InlineParser, plugin_footnotes,
+from .mistune_shim import (HTMLRenderer, InlineParser, plugin_footnotes, plugin_table) # type: ignore
 from .pcbnew_common import fakeKiCADGui
 from .plot import find_data_file, get_global_datapaths
 

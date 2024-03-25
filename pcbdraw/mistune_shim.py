@@ -1,4 +1,5 @@
-import mistune  # type: ignore
+# type: ignore
+import mistune
 
 __all__ = [
     "BaseRenderer",
@@ -13,16 +14,15 @@ mistune_version = tuple(int(i) for i in mistune.__version__.split("."))
 mistune_major_version = mistune_version[0]
 
 if mistune_major_version == 3:
-    from mistune.plugins.footnotes import \
-        footnotes as plugin_footnotes  # type: ignore
-    from mistune.plugins.table import table as plugin_table  # type: ignore
+    from mistune.plugins.footnotes import footnotes as plugin_footnotes
+    from mistune.plugins.table import table as plugin_table
 
     InlineParser = mistune.InlineParser
     HTMLRenderer = mistune.HTMLRenderer
     BaseRenderer = mistune.BaseRenderer
 elif mistune_major_version == 2:
-    from mistune.plugins.footnotes import plugin_footnotes  # type: ignore
-    from mistune.plugins.table import plugin_table  # type: ignore
+    from mistune.plugins.footnotes import plugin_footnotes
+    from mistune.plugins.table import plugin_table
 
     InlineParser = mistune.inline_parser.InlineParser
     HTMLRenderer = mistune.renderers.HTMLRenderer
