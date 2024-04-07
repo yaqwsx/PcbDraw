@@ -79,7 +79,7 @@ class CommaComponentList(CommaList):
         for i in reversed(range(len(values))):
             c = values[i]
             if c.count('-') == 1:  # if we have a - for a range (for example R3-R9)
-                s_m = re.match(r'(\w*?)(\d+)-(\w*?)(\d+)$', c)
+                s_m = re.match(r'([a-zA-Z]+?)(\d+)-([a-zA-Z]+?)(\d+)$', c)
                 if s_m is None:
                     continue
                 try:
