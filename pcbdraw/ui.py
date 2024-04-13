@@ -7,6 +7,8 @@ from typing import Tuple, Optional, Any, List
 import click
 from PIL import Image
 
+from .create_template import libtemplate
+
 from . import __version__
 from .convert import save
 from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
@@ -121,6 +123,8 @@ class WarningStderrReporter:
     help="Add paste layer")
 @click.option("--components/--no-components", default=True,
     help="Render components")
+@click.option("--copper/--no-copper", default=True,
+    help="Render copper")
 @click.option("--outline-width", type=float, default=0.15,
     help="Outline width in mm")
 @click.option("--show-lib-paths", is_flag=True,
@@ -129,8 +133,9 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
          placeholders: bool, remap: str, drill_holes: bool, side: str,
          mirror: bool, highlight: List[str], filter: Optional[List[str]],
          vcuts: bool, dpi: int, margin: float, silent: bool, werror: bool,
-         resistor_values: List[str], resistor_flip: List[str], rotation_values: List[str],
-         components: bool, paste: bool, outline_width: float, show_lib_paths: bool) -> int:
+         resistor_values: List[str], resistor_flip: List[str], components: bool,
+         rotation_values: List[str], copper: bool, paste: bool, outline_width: float,
+         show_lib_paths: bool) -> int:
     """
     Create a stylized drawing of the PCB.
     """
@@ -167,6 +172,7 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
 
     plotter.plot_plan = [PlotSubstrate(
                             drill_holes=drill_holes,
+                            copper=copper,
                             outline_width=mm2ki(outline_width))]
     if paste:
         plotter.plot_plan.append(PlotPaste())
@@ -329,6 +335,7 @@ def run() -> None:
 run.add_command(render)
 run.add_command(plot)
 run.add_command(populate)
+run.add_command(libtemplate)
 
 if __name__ == "__main__":
     run()

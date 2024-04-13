@@ -43,7 +43,7 @@ has the following options:
 - `--resistor-flip COMMA SEPARATED LIST` Comma separated list of resistor
   designators whose bands to flip.
 - `--paste` Render paste layer
-- `-components / --no-components` Render components
+- `--components / --no-components` Render components
 - `--outline-width FLOAT` Outline width of the board substrate in mm
 - `--dpi INTEGER` DPI for bitmap output
 - `--margin INTEGER` Specify margin of the final image in millimeters
