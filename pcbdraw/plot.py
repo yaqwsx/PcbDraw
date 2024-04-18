@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import decimal
 import json
 import math
@@ -698,17 +699,14 @@ class PlotSubstrate(PlotInterface):
 
     def _process_baselayer(self, name: str, source_filename: str) -> None:
         clipPath = self._plotter.get_def_slot(tag_name="clipPath", id="cut-off")
-        clipPath.append(
-            get_board_polygon(
-                extract_svg_content(
-                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        board_polygon = get_board_polygon(
+                            extract_svg_content(
+                                read_svg_unique(source_filename, self._plotter.unique_prefix())))
+        clipPath.append(board_polygon)
 
         layer = etree.SubElement(self._container, "g", id="substrate-"+name,
             style="fill:{0}; stroke:{0};".format(self._plotter.get_style(name)))
-        layer.append(
-            get_board_polygon(
-                extract_svg_content(
-                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        layer.append(deepcopy(board_polygon))
         for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
