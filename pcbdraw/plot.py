@@ -135,15 +135,19 @@ class SvgPathItem:
 def matrix(data: List[List[Numeric]]) -> Matrix:
     return np.array(data, dtype=np.float32)
 
-def pseudo_distance(a: Point, b: Point) -> Numeric:
-    return (a[0] - b[0])**2 + (a[1] - b[1])**2
+# def distance(a: Point, b: Point) -> Numeric:
+#     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def distance(a: Point, b: Point) -> Numeric:
-    return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+def pseudo_distance(a: Point, b: Point) -> Numeric:
+    a0 = a[0] - b[0]
+    a1 = a[1] - b[1]
+    return a0*a0 + a1*a1
 
 def get_closest(reference: Point, elems: List[Point]) -> int:
-    distances = [pseudo_distance(reference, x) for x in elems]
-    return int(np.argmin(distances))
+    try:
+        return elems.index(reference)
+    except ValueError:
+        return int(np.argmin([pseudo_distance(reference, x) for x in elems]))
 
 def extract_arg(args: List[Any], index: int, default: Any=None) -> Any:
     """
