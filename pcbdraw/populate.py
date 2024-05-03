@@ -23,6 +23,7 @@ from .plot import find_data_file, get_global_datapaths
 PKG_BASE = os.path.dirname(__file__)
 
 def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any=None) -> Any:
+    """The rule given to mistune to parse out the desired variables (side and component)"""
     text = m.group(1)
     side, components = text.split("|")
     components = list(map(lambda x: x.strip(), components.split(",")))
@@ -232,11 +233,13 @@ def generate_image(boardfilename: str, side: str, components: List[str],
     plot_args += ["--filter", ",".join(components)]
     plot_args += ["--highlight", ",".join(active)]
     plot_args += [boardfilename, outputfile]
+    tmp_std = sys.stdout        # make a copy of stdout in order to preserve it before Click overrides it
     try:
         plot.main(args=plot_args)
     except SystemExit as e:
         if e.code is not None and e.code != 0:
             raise e from None
+    sys.stdout = tmp_std        # restore copied stdout for print statements to work
 
 def get_data_path() -> List[str]:
     paths: List[str] = []

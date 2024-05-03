@@ -1,5 +1,6 @@
 import platform
 import sys
+import re
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Tuple, Optional, Any, List
@@ -68,6 +69,36 @@ class CommaList(click.ParamType):
         values = [x.strip() for x in value.split(",")]
         return values
 
+
+class CommaComponentList(CommaList):
+    name = "Comma separated component list, with optional ranges like R1-R20"
+
+    def convert(self, value: Any, param: Optional[click.Parameter],
+                ctx: Optional[click.Context]) -> List[str]:
+        values = super().convert(value, param, ctx)
+        for i in reversed(range(len(values))):
+            c = values[i]
+            if c.count('-') == 1:  # if we have a - for a range (for example R3-R9)
+                s_m = re.match(r'([a-zA-Z]+?)(\d+)-([a-zA-Z]+?)(\d+)$', c)
+                if s_m is None:
+                    continue
+                try:
+                    prefix = s_m.group(1)
+                    if prefix != s_m.group(3):  # if the first and second prefix don't match, ignore
+                        continue
+                    start_n = int(s_m.group(2))
+                    end_n = int(s_m.group(4))
+                except (IndexError, ValueError):
+                    # if we either didn't have a full regex match, or the numbers weren't integers somehow?
+                    continue
+                if start_n > end_n:  # check that the first number is the lower limit (R6-R2 is not valid)
+                    continue
+                # Replace XY-XZ with [XY, X(Y+1), X(Y+2), ..., X(Z-1), ZX]
+                values += [f"{prefix}{i}" for i in range(start_n, end_n + 1)]
+                values.pop(i)
+        return values
+
+
 @dataclass
 class WarningStderrReporter:
     silent: bool
@@ -99,9 +130,9 @@ class WarningStderrReporter:
     help="Specify which side of the PCB to render")
 @click.option("--mirror", is_flag=True,
     help="Mirror the board")
-@click.option("--highlight", type=CommaList(), default=[],
+@click.option("--highlight", type=CommaComponentList(), default=[],
     help="Comma separated list of components to highlight")
-@click.option("--filter", "-f", type=CommaList(), default=None,
+@click.option("--filter", "-f", type=CommaComponentList(), default=None,
     help="Comma separated list of components to show, if not specified, show all")
 @click.option("--vcuts", "-v", type=KiCADLayer(), default=None,
     help="If layer specified, renders V-cuts from it")
@@ -115,7 +146,7 @@ class WarningStderrReporter:
     help="Treat warnings as errors")
 @click.option("--resistor-values", type=CommaList(), default=[],
     help="Comma separated list of resistor value remapping. For example, \"R1:10k,R2:470\"")
-@click.option("--resistor-flip", type=CommaList(), default=[],
+@click.option("--resistor-flip", type=CommaComponentList(), default=[],
     help="Comma separated list of resistor bands to flip")
 @click.option("--paste", is_flag=True,
     help="Add paste layer")
