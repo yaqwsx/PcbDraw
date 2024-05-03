@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import decimal
 import json
 import math
@@ -135,15 +136,19 @@ class SvgPathItem:
 def matrix(data: List[List[Numeric]]) -> Matrix:
     return np.array(data, dtype=np.float32)
 
-def pseudo_distance(a: Point, b: Point) -> Numeric:
-    return (a[0] - b[0])**2 + (a[1] - b[1])**2
+# def distance(a: Point, b: Point) -> Numeric:
+#     return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
-def distance(a: Point, b: Point) -> Numeric:
-    return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+def pseudo_distance(a: Point, b: Point) -> Numeric:
+    a0 = a[0] - b[0]
+    a1 = a[1] - b[1]
+    return a0*a0 + a1*a1
 
 def get_closest(reference: Point, elems: List[Point]) -> int:
-    distances = [pseudo_distance(reference, x) for x in elems]
-    return int(np.argmin(distances))
+    try:
+        return elems.index(reference)
+    except ValueError:
+        return int(np.argmin([pseudo_distance(reference, x) for x in elems]))
 
 def extract_arg(args: List[Any], index: int, default: Any=None) -> Any:
     """
@@ -694,17 +699,14 @@ class PlotSubstrate(PlotInterface):
 
     def _process_baselayer(self, name: str, source_filename: str) -> None:
         clipPath = self._plotter.get_def_slot(tag_name="clipPath", id="cut-off")
-        clipPath.append(
-            get_board_polygon(
-                extract_svg_content(
-                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        board_polygon = get_board_polygon(
+                            extract_svg_content(
+                                read_svg_unique(source_filename, self._plotter.unique_prefix())))
+        clipPath.append(board_polygon)
 
         layer = etree.SubElement(self._container, "g", id="substrate-"+name,
             style="fill:{0}; stroke:{0};".format(self._plotter.get_style(name)))
-        layer.append(
-            get_board_polygon(
-                extract_svg_content(
-                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        layer.append(deepcopy(board_polygon))
         for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
