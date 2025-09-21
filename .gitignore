@@ -93,3 +93,6 @@ ENV/
 
 # PyCharm settings
 .idea
+
+# KiCad stuff:
+*.lck

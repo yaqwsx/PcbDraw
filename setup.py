@@ -26,14 +26,14 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "lxml",
-        "mistune>=2.0.2",
+        "mistune>=2.0.2,<3",
         "pybars3",
         "pyyaml",
         "svgpathtools==1.4.1",
         "pcbnewTransition>=0.4",
         "LnkParse3; platform_system=='Windows'",
         "pyVirtualDisplay~=3.0; platform_system!='Windows'",
-        "Pillow~=9.0",
+        "Pillow>=9.0",
         "click>=7.1"
     ],
     setup_requires=[

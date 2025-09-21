@@ -112,6 +112,8 @@ class PcbnewSession:
             for title, id in windows.items():
                 if any([pattern in title.lower() for pattern in titlePatterns]):
                     return id
+                if "kicad pcb editor warning" in title.lower():
+                    self._xdotool(["key", "--window", str(id), "Return"])
             time.sleep(1)
         windows_list = "\n".join([f"- {t}" for t in windows.keys()])
         raise TimeoutError(f"None of '{titlePatterns}' didn't appear within timeout. Available windows:\n{windows_list}")
