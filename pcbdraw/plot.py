@@ -416,16 +416,17 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
         for svg_element in group:
             if svg_element.tag == "path":
                 p = svg_element.attrib["d"]
-                # Handle closed polygon paths (KiCad 7.0.1+)
-                polygon = re.fullmatch(r"M ((\d+\.\d+),(\d+\.\d+) )+Z", p)
-                if polygon:
-                    polygon_pts = re.findall(r"(\d+\.\d+),(\d+\.\d+) ", p)
-                    start = polygon_pts[0]
+                # Handle closed polygon paths (M x,y x,y ... Z)
+                # that some KiCAD versions emit for Edge.Cuts
+                polygon_pts = re.findall(
+                    r"(-?[\d.]+)[, ](-?[\d.]+)", p)
+                if p.strip().startswith("M") and p.strip().endswith("Z") and len(polygon_pts) >= 3:
+                    # Decompose closed polygon into line segments
                     polygon_pts.append(polygon_pts[0])
-                    for end in polygon_pts[1:]:
-                        line_path = 'M'+start[0]+' '+start[1]+' L'+end[0]+' '+end[1]
-                        elements.append(SvgPathItem(line_path))
-                        start = end
+                    for i in range(len(polygon_pts) - 1):
+                        sx, sy = polygon_pts[i]
+                        ex, ey = polygon_pts[i + 1]
+                        elements.append(SvgPathItem(f"M {sx} {sy} L {ex} {ey}"))
                 else:
                     elements.append(SvgPathItem(p))
             elif svg_element.tag == "circle":

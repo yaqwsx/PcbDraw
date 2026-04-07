@@ -169,9 +169,29 @@ class TestGetBoardPolygon:
         assert result.tag == "path"
         assert "d" in result.attrib
 
-    def test_closed_polygon_kicad7(self):
+    def test_closed_polygon_comma_separated(self):
         """KiCad 7.0.1+ emits closed polygon paths like 'M x,y x,y Z'."""
         elements = self._wrap_svg("M 0.0,0.0 10.0,0.0 10.0,10.0 0.0,10.0 Z")
         result = get_board_polygon(elements)
         d = result.attrib["d"]
         assert "L" in d  # decomposed into line segments
+
+    def test_closed_polygon_negative_coords(self):
+        elements = self._wrap_svg("M -5.0,10.0 15.0,10.0 15.0,-10.0 -5.0,-10.0 Z")
+        result = get_board_polygon(elements)
+        d = result.attrib["d"]
+        assert "L" in d
+
+    def test_closed_polygon_integers(self):
+        elements = self._wrap_svg("M 0,0 10,0 10,10 0,10 Z")
+        result = get_board_polygon(elements)
+        d = result.attrib["d"]
+        assert "L" in d
+
+    def test_regular_line_not_treated_as_polygon(self):
+        """M ... L ... paths should not be decomposed."""
+        elements = self._wrap_svg("M 0 0 L 10 0")
+        result = get_board_polygon(elements)
+        d = result.attrib["d"]
+        # Should contain exactly one M and one L from the original path
+        assert d.count("M") == 1
