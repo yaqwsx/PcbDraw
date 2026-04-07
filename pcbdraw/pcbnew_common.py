@@ -1,9 +1,9 @@
 import sys
-from pcbnewTransition import pcbnew, isV6 # type: ignore
-from pcbnewTransition.pcbnew import BOX2I # type: ignore
+import pcbnew  # type: ignore
+from pcbnew import BOX2I  # type: ignore
 from itertools import chain
 from typing import Optional, List
-import wx # type: ignore
+import wx  # type: ignore
 import os
 
 def getBBoxWithoutContours(edge: pcbnew.EDA_SHAPE) -> pcbnew.BOX2I:
@@ -39,13 +39,13 @@ def collectEdges(board: pcbnew.BOARD, layerName: str) -> List[pcbnew.EDA_SHAPE]:
     for edge in chain(board.GetDrawings(), *[m.GraphicalItems() for m in board.GetFootprints()]):
         if edge.GetLayerName() != layerName:
             continue
-        if isV6() and isinstance(edge, pcbnew.PCB_DIMENSION_BASE):
+        if isinstance(edge, pcbnew.PCB_DIMENSION_BASE):
             continue
         edges.append(edge)
     return edges
 
 def combineBoundingBoxes(a: pcbnew.BOX2I, b: pcbnew.BOX2I) -> pcbnew.BOX2I:
-    """ Retrun BOX2I as a combination of source bounding boxes """
+    """ Return BOX2I as a combination of source bounding boxes """
     x1 = min(a.GetX(), b.GetX())
     y1 = min(a.GetY(), b.GetY())
     x2 = max(a.GetX() + a.GetWidth(), b.GetX() + b.GetWidth())

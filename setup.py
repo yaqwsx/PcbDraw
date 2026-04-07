@@ -10,7 +10,7 @@ setuptools.setup(
     name="PcbDraw",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     author="Jan Mrázek",
     author_email="email@honzamrazek.cz",
     description="Utility to produce nice looking drawings of KiCAD boards",
@@ -26,14 +26,11 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "lxml",
-        "mistune>=2.0.2",
+        "mistune>=3.0",
         "pybars3",
         "pyyaml",
         "svgpathtools==1.4.1",
-        "pcbnewTransition>=0.4",
-        "LnkParse3; platform_system=='Windows'",
-        "pyVirtualDisplay~=3.0; platform_system!='Windows'",
-        "Pillow~=9.0",
+        "Pillow>=9.0",
         "click>=7.1"
     ],
     setup_requires=[

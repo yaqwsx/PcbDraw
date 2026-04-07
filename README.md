@@ -23,9 +23,9 @@ previews of your boards (e.g., in CI).
 
 ## Installation
 
-PcbDraw is a stand-alone CLI tool distributed as a Python package `pcbdraw`. It
-also requires Inkscape 1 or librsvg installed. Read more details in the
-[installation guide](doc/installation.md).
+PcbDraw requires **KiCAD 9 or newer** and is distributed as a Python package
+`pcbdraw`. It also requires Inkscape 1 or librsvg installed. Read more details
+in the [installation guide](doc/installation.md).
 
 ## Usage
 

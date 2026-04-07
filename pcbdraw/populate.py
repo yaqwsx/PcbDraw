@@ -10,155 +10,218 @@ from itertools import chain
 from typing import List, Optional, Any, Tuple, Dict
 
 import click
-import pybars # type: ignore
+import pybars  # type: ignore
 import yaml
 
-import pcbdraw.mdrenderer
+import mistune
+from mistune.plugins.footnotes import footnotes as plugin_footnotes
+from mistune.plugins.table import table as plugin_table
+from mistune.renderers.markdown import MarkdownRenderer
 
-from .mistune_shim import mistune  # type: ignore
-from .mistune_shim import (HTMLRenderer, InlineParser, plugin_footnotes, plugin_table) # type: ignore
 from .pcbnew_common import fakeKiCADGui
 from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
 
-def parse_pcbdraw(lexer: Any, m: re.Match[str], state: Any=None) -> Any:
-    text = m.group(1)
+
+def parse_pcbdraw(inline: Any, m: re.Match[str], state: Any) -> int:
+    text = m.group("pcbdraw_content")
     side, components = text.split("|")
-    components = list(map(lambda x: x.strip(), components.split(",")))
-    return 'pcbdraw', side, components
-
-class PcbDrawInlineLexer(InlineParser): # type: ignore
-    def __init__(self, renderer: Any, **kwargs: Any) -> None:
-        super(PcbDrawInlineLexer, self).__init__(renderer, **kwargs)
-        self.enable_pcbdraw()
-
-    def enable_pcbdraw(self) -> None:
-        pcbdraw_pattern = (
-            r"\[\["                   # [[
-            r"([\s\S]+?\|[\s\S]+?)"   # side| component
-            r"\]\](?!\])"             # ]]
-        )
-        if hasattr(self, 'register_rule'):
-            # mistune v2 API
-            self.rules.insert(3, 'pcbdraw')
-            self.register_rule('pcbdraw', pcbdraw_pattern, parse_pcbdraw)
-        else:
-            # mistune v0.8.4
-            self.rules.pcbdraw = re.compile(pcbdraw_pattern)
-            self.default_rules.insert(3, 'pcbdraw')
-
-    # This method is invoked by the old mistune API (i.e. v0.8.4)
-    # For the new API we register `parse_pcbdraw`
-    def output_pcbdraw(self, m: re.Match[str]) -> Any:
-        _, side, components = parse_pcbdraw(self, m)
-        return self.renderer.pcbdraw(side, components)
+    components = [x.strip() for x in components.split(",")]
+    state.append_token({
+        "type": "pcbdraw",
+        "raw": text,
+        "attrs": {"side": side, "components": components},
+    })
+    return m.end()
 
 
-def Renderer(BaseRenderer, initial_components: List[str]): # type: ignore
-    class Tmp(BaseRenderer): # type: ignore
-        def __init__(self, initial_components: List[str]) -> None:
-            super(Tmp, self).__init__(escape=False)
-            self.items: List[Dict[str, Any]]= []
-            self.current_item: Optional[Dict[str, Any]] = None
-            self.active_side: str = "front"
-            self.visited_components: List[str] = initial_components
-            self.active_components: List[str] = []
+PCBDRAW_PATTERN = (
+    r"\[\["                               # [[
+    r"(?P<pcbdraw_content>[\s\S]+?\|[\s\S]+?)"  # side| component
+    r"\]\](?!\])"                         # ]]
+)
 
-        def append_comment(self, html: str) -> None:
-            if self.current_item is not None and self.current_item["type"] == "steps":
-                self.items.append(self.current_item)
-            if self.current_item is None or self.current_item["type"] == "steps":
-                self.current_item = {
-                    "is_comment": True,
-                    "type": "comment",
-                    "content": ""
-                }
-            self.current_item["content"] += html
 
-        def append_step(self, step: Dict[str, Any]) -> None:
-            if self.current_item is not None and self.current_item["type"] == "comment":
-                self.items.append(self.current_item)
-            if self.current_item is None or self.current_item["type"] == "comment":
-                self.current_item = {
-                    "is_step": True,
-                    "type": "steps",
-                    "steps": []
-                }
-            self.current_item["steps"].append(step)
+def pcbdraw_plugin(md: mistune.Markdown) -> None:
+    md.inline.register("pcbdraw", PCBDRAW_PATTERN, parse_pcbdraw, before="link")
 
-        def output(self) -> List[Dict[str, Any]]:
-            items = self.items
-            if self.current_item is not None:
-                items.append(self.current_item)
-            return items
 
-        def pcbdraw(self, side: str, components: List[str]) -> str:
-            self.active_side = side
-            self.visited_components += components
-            self.active_components = components
-            return ""
+def Renderer(base_cls: type, initial_components: List[str]) -> Any:
+    """
+    Create a renderer instance that tracks assembly steps.
 
-        def block_code(self, children: str, info: Optional[str]=None) -> Any:
-            retval = super(Tmp, self).block_code(children, info)
-            self.append_comment(retval)
-            return retval
+    For HTMLRenderer: methods receive simple text args.
+    For MarkdownRenderer: methods receive (token, state) args.
+    """
+    if base_cls is mistune.HTMLRenderer:
+        return _HtmlStepRenderer(initial_components)
+    else:
+        return _MarkdownStepRenderer(initial_components)
 
-        def block_quote(self, text: str) -> Any:
-            retval = super(Tmp, self).block_quote(text)
-            self.append_comment(retval)
-            return retval
 
-        def block_html(self, html: str) -> Any:
-            retval = super(Tmp, self).block_html(html)
-            self.append_comment(retval)
-            return retval
+class _StepRendererMixin:
+    """Common state tracking for both HTML and Markdown renderers."""
 
-        def heading(self, children: str, level: int) -> Any:
-            retval = super(Tmp, self).heading(children, level)
-            self.append_comment(retval)
-            return retval
+    def __init__(self, initial_components: List[str]) -> None:
+        self.items: List[Dict[str, Any]] = []
+        self.current_item: Optional[Dict[str, Any]] = None
+        self.active_side: str = "front"
+        self.visited_components: List[str] = list(initial_components)
+        self.active_components: List[str] = []
 
-        # Mistune 0.8.4 API
-        def header(self, text: str, level: int, raw: Optional[str]=None) -> Any:
-            retval = super(Tmp, self).header(text, level, raw)
-            self.append_comment(retval)
-            return retval
-
-        # Mistune 0.8.4 API
-        def hrule(self) -> Any:
-            retval = super(Tmp, self).hrule()
-            self.append_comment(retval)
-            return retval
-
-        def thematic_break(self) -> Any:
-            retval = super(Tmp, self).thematic_break()
-            self.append_comment(retval)
-            return retval
-
-        def list(self, text: Any, ordered: bool, level: Any=None, start: Any=None) -> str:
-            return ""
-
-        def list_item(self, text: str, level: Any=None) -> str:
-            step = {
-                "side": self.active_side,
-                "components": self.visited_components,
-                "active_components": self.active_components,
-                "comment": text
+    def append_comment(self, html: str) -> None:
+        if self.current_item is not None and self.current_item["type"] == "steps":
+            self.items.append(self.current_item)
+        if self.current_item is None or self.current_item["type"] == "steps":
+            self.current_item = {
+                "is_comment": True,
+                "type": "comment",
+                "content": ""
             }
-            self.append_step(deepcopy(step))
-            return ""
+        self.current_item["content"] += html
 
-        def paragraph(self, text: str) -> Any:
-            retval = super(Tmp, self).paragraph(text)
-            self.append_comment(retval)
-            return retval
+    def append_step(self, step: Dict[str, Any]) -> None:
+        if self.current_item is not None and self.current_item["type"] == "comment":
+            self.items.append(self.current_item)
+        if self.current_item is None or self.current_item["type"] == "comment":
+            self.current_item = {
+                "is_step": True,
+                "type": "steps",
+                "steps": []
+            }
+        self.current_item["steps"].append(step)
 
-        def table(self, header: str, body: str) -> Any:
-            retval = super(Tmp, self).table(header, body)
-            self.append_comment(retval)
-            return retval
-    return Tmp(initial_components)
+    def output(self) -> List[Dict[str, Any]]:
+        items = list(self.items)
+        if self.current_item is not None:
+            items.append(self.current_item)
+        return items
+
+    def handle_pcbdraw(self, side: str, components: List[str]) -> None:
+        self.active_side = side
+        self.visited_components += components
+        self.active_components = components
+
+    def handle_step(self, text: str) -> None:
+        step = {
+            "side": self.active_side,
+            "components": list(self.visited_components),
+            "active_components": list(self.active_components),
+            "comment": text,
+        }
+        self.append_step(deepcopy(step))
+
+
+class _HtmlStepRenderer(_StepRendererMixin, mistune.HTMLRenderer):
+    """Renderer for HTML output that tracks assembly steps."""
+
+    def __init__(self, initial_components: List[str]) -> None:
+        _StepRendererMixin.__init__(self, initial_components)
+        mistune.HTMLRenderer.__init__(self)
+
+    def pcbdraw(self, text: str, side: str = "", components: Optional[List[str]] = None) -> str:
+        self.handle_pcbdraw(side, components or [])
+        return ""
+
+    def block_code(self, code: str, info: Optional[str] = None) -> str:
+        retval = super().block_code(code, info)
+        self.append_comment(retval)
+        return retval
+
+    def block_quote(self, text: str) -> str:
+        retval = super().block_quote(text)
+        self.append_comment(retval)
+        return retval
+
+    def block_html(self, html: str) -> str:
+        retval = super().block_html(html)
+        self.append_comment(retval)
+        return retval
+
+    def heading(self, text: str, level: int, **attrs: Any) -> str:
+        retval = super().heading(text, level, **attrs)
+        self.append_comment(retval)
+        return retval
+
+    def thematic_break(self) -> str:
+        retval = super().thematic_break()
+        self.append_comment(retval)
+        return retval
+
+    def list(self, text: str, ordered: bool, **attrs: Any) -> str:
+        return ""
+
+    def list_item(self, text: str) -> str:
+        self.handle_step(text)
+        return ""
+
+    def paragraph(self, text: str) -> str:
+        retval = super().paragraph(text)
+        self.append_comment(retval)
+        return retval
+
+    def table(self, text: str) -> str:  # type: ignore[override]
+        # table() is registered by the table plugin, not on the base class
+        self.append_comment(text)
+        return text
+
+
+class _MarkdownStepRenderer(_StepRendererMixin, MarkdownRenderer):
+    """Renderer for Markdown output that tracks assembly steps."""
+
+    def __init__(self, initial_components: List[str]) -> None:
+        _StepRendererMixin.__init__(self, initial_components)
+        MarkdownRenderer.__init__(self)
+
+    def pcbdraw(self, token: Dict[str, Any], state: Any) -> str:
+        attrs = token.get("attrs", {})
+        self.handle_pcbdraw(attrs.get("side", ""), attrs.get("components", []))
+        return ""
+
+    def block_code(self, token: Dict[str, Any], state: Any) -> str:
+        retval = super().block_code(token, state)
+        self.append_comment(retval)
+        return retval
+
+    def block_quote(self, token: Dict[str, Any], state: Any) -> str:
+        retval = super().block_quote(token, state)
+        self.append_comment(retval)
+        return retval
+
+    def block_html(self, token: Dict[str, Any], state: Any) -> str:
+        retval = super().block_html(token, state)
+        self.append_comment(retval)
+        return retval
+
+    def heading(self, token: Dict[str, Any], state: Any) -> str:
+        retval = super().heading(token, state)
+        self.append_comment(retval)
+        return retval
+
+    def thematic_break(self, token: Dict[str, Any], state: Any) -> str:
+        retval = super().thematic_break(token, state)
+        self.append_comment(retval)
+        return retval
+
+    def list(self, token: Dict[str, Any], state: Any) -> str:
+        # Process children to trigger list_item calls
+        children = token.get("children", [])
+        for child in children:
+            self.render_token(child, state)
+        return ""
+
+    def list_item(self, token: Dict[str, Any], state: Any) -> str:
+        children = token.get("children", [])
+        text = self.render_children(token, state)
+        self.handle_step(text)
+        return ""
+
+    def paragraph(self, token: Dict[str, Any], state: Any) -> str:
+        retval = super().paragraph(token, state)
+        self.append_comment(retval)
+        return retval
+
 
 def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
     header = None
@@ -172,12 +235,12 @@ def load_content(filename: str) -> Tuple[Optional[Dict[str, Any]], str]:
     return header, content
 
 def parse_content(renderer: Any, content: str) -> List[Dict[str, Any]]:
-    lexer = PcbDrawInlineLexer(renderer)
-    processor = mistune.Markdown(renderer=renderer, inline=lexer)
-    plugin_table(processor)
-    plugin_footnotes(processor)
+    processor = mistune.Markdown(
+        renderer=renderer,
+        plugins=[pcbdraw_plugin, plugin_table, plugin_footnotes],
+    )
     processor(content)
-    return renderer.output() # type: ignore
+    return renderer.output()  # type: ignore[no-any-return]
 
 def read_template(filename: str) -> str:
     with codecs.open(filename, encoding="utf-8") as f:
@@ -188,7 +251,7 @@ def generate_html(template: str, input: List[Dict[str, Any]]) -> bytes:
         "items": input
     }
     template_fn = pybars.Compiler().compile(template)
-    return template_fn(input_dict).encode("utf-8") # type: ignore
+    return template_fn(input_dict).encode("utf-8")  # type: ignore
 
 def generate_markdown(input: List[Dict[str, Any]]) -> bytes:
     output = ""
@@ -304,8 +367,9 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
     except KeyError as e:
         sys.exit(f"Missing parameter {e} either in template file or source header")
 
+    assert header is not None
     if type == "html":
-        renderer = Renderer(HTMLRenderer, header.get("initial_components", [])) # type: ignore
+        renderer = Renderer(mistune.HTMLRenderer, header.get("initial_components", []))
         outputfile = "index.html"
         try:
             assert template is not None
@@ -316,11 +380,9 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
         except IOError:
             sys.exit("Cannot open template file " + str(template))
     else:
-        renderer = Renderer(pcbdraw.mdrenderer.MdRenderer, header.get("initial_components", [])) # type: ignore
+        renderer = Renderer(MarkdownRenderer, header.get("initial_components", []))
         outputfile = "index.md"
     parsed_content = parse_content(renderer, content)
-    if header is None:
-        raise RuntimeError("Parameters were not specified in the template")
     parsed_content = generate_images(parsed_content, board, prepare_params(header["params"]),
                                      imgname, outputpath)
     if type == "html":

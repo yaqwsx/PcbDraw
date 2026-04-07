@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from typing import BinaryIO, Callable, Union
-from pcbnewTransition import pcbnew # type: ignore
+import pcbnew  # type: ignore
 import click
 import os
 from pathlib import Path

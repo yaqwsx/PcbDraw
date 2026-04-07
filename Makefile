@@ -1,12 +1,12 @@
 
 
-.PHONY: package release test test-system test-unit mypy
+.PHONY: package release test test-unit mypy
 
 all: package
 
 package:
 	rm -f dist/*
-	python3 setup.py sdist bdist_wheel
+	python3 -m build
 
 install: package
 	pip3 install --no-deps --force dist/*.whl
@@ -14,16 +14,10 @@ install: package
 release: package
 	twine upload dist/*
 
-test: test-system test-unit mypy
-
-build/test:
-	mkdir -p $@
-
-test-system: build/test $(shell find pcbdraw -type f)
-	cd build/test && bats ../../test/system
+test: test-unit mypy
 
 test-unit:
-	cd test/units && pytest
+	pytest test/
 
 mypy:
 	cd pcbdraw && mypy .

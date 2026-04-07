@@ -1,11 +1,9 @@
-import platform
 import sys
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Tuple, Optional, Any, List
 
 import click
-from PIL import Image
 
 from .create_template import libtemplate
 
@@ -242,76 +240,41 @@ def print_lib_paths(plotter: PcbPlotter) -> None:
     else:
         print("No paths for the libraries were found")
 
-def processColor(c: Tuple[Optional[int], Optional[int], Optional[int]]) \
-        -> Optional[Tuple[int, int, int]]:
-    if c[0] is not None and c[1] is not None and c[2] is not None:
-        return c[0], c[1], c[2]
-    return None
-
-
 @click.command()
 @click.argument("input", type=click.Path(file_okay=True, dir_okay=False, exists=True))
 @click.argument("output", type=click.Path(file_okay=True, dir_okay=False))
 @click.option("--side", type=click.Choice(["front", "back"]), default="front",
     help="Specify which side to render")
-@click.option("--padding", type=int, default=5,
-    help="Image padding in millimeters")
 @click.option("--renderer", type=click.Choice(["raytrace", "normal"]), default="raytrace",
     help="Specify what renderer to use")
 @click.option("--projection", type=click.Choice(["orthographic", "perspective"]), default="orthographic",
     help="Specify projection")
-@click.option("--no-components", is_flag=True, default=False,
-    help="Disable component rendering")
 @click.option("--transparent", is_flag=True,
     help="Make transparent background of the image")
-@click.option("--baseresolution", type=int, default=3000,
-    help="Canvas size for the renderer; resulting boards is roughly 2/3 of the resolution")
-@click.option("--bgcolor1", type=(int, int, int), default=(None, None, None),
-    help="First background color")
-@click.option("--bgcolor2", type=(int, int, int), default=(None, None, None),
-    help="Second background color")
+@click.option("--padding", type=int, default=30,
+    help="Padding around the board after cropping, in pixels")
+@click.option("--width", type=int, default=1600,
+    help="Render canvas width in pixels (before cropping)")
+@click.option("--height", type=int, default=900,
+    help="Render canvas height in pixels (before cropping)")
 def render(input: str, output: str, side: str, renderer: str, projection: str,
-           no_components: bool, transparent: bool, padding: float,
-           baseresolution: int,
-           bgcolor1: Tuple[Optional[int], Optional[int], Optional[int]],
-           bgcolor2: Tuple[Optional[int], Optional[int], Optional[int]]) -> None:
+           transparent: bool, padding: int, width: int, height: int) -> None:
     """
-    Create a rendered image of the PCB using KiCAD's 3D Viewer
+    Create a rendered image of the PCB using kicad-cli's 3D renderer
     """
-    if platform.system() == "Windows":
-        sys.exit("Render functionality is not available on Windows.")
+    from .renderer import RenderAction, Side, renderBoard
 
-    from .renderer import (GuiPuppetError, RenderAction, Side, postProcessCrop,
-                       renderBoard, validateExternalPrerequisites)
-
-    try:
-        validateExternalPrerequisites()
-
-        app = fakeKiCADGui()
-
-        bc1 = processColor(bgcolor1)
-        bc2 = processColor(bgcolor2)
-
-        plan = [RenderAction(
-            side=Side.FRONT if side == "front" else Side.BACK,
-            components=not no_components,
-            raytraced=renderer == "raytrace",
-            orthographic=projection == "orthographic",
-            postprocess=postProcessCrop(input, mm2ki(padding), mm2ki(padding), transparent)
-        )]
-        if transparent:
-            if bc1 is not None or bc2 is not None:
-                print("Transparent background was specified, ignoring colors")
-            bc2 = bc1 = (200, 100, 100)
-        images = renderBoard(input, plan, baseResolution=(baseresolution, baseresolution),
-                            bgColor1=bc1, bgColor2=bc2)
-        save(image=images[0][0], filename=output)
-    except GuiPuppetError as e:
-        img_save_msg = ""
-        if e.img is not None and isinstance(e.img, Image.Image):
-            e.img.save("error.png")
-            img_save_msg = "; image saved in error.png"
-        raise RuntimeError(f"The following GUI error ocurred{img_save_msg}:\n{e}")
+    plan = RenderAction(
+        side=Side.FRONT if side == "front" else Side.BACK,
+        raytraced=renderer == "raytrace",
+        orthographic=projection == "orthographic",
+        transparent=transparent,
+        padding=padding,
+        width=width,
+        height=height,
+    )
+    image = renderBoard(input, plan)
+    image.save(output)
 
 @click.group()
 @click.version_option(__version__)

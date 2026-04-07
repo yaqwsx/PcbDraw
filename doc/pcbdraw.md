@@ -6,10 +6,8 @@ visualizations. There are two modes of drawing the boards:
 - plotting them. The result is a simplified and stylized board image. However,
   you have to supply hand-drawn footprint images. It can also remap symbols,
   easily select board style and also, render resistor values color bands.
-- rendering them. This optional invokes Pcbnew's 3D renderer and renders the 3D
-  image of the board. Note that this option doesn't work on Windows and its
-  implementation is rather hacky and fragile as KiCAD doesn't offer any API for
-  programmatically obtaining 3D renders of the board.
+- rendering them. This invokes `kicad-cli pcb render` to produce a 3D image of
+  the board. Requires KiCAD 9 or newer.
 
 ## Plotting boards
 
@@ -20,7 +18,7 @@ has the following options:
 - `-s, --style TEXT` name of the style or a path to a style file. Style files
   are explained below.
 - `-l, --libs COMMA SEPARATED LIST` name of libraries that will be used for
-  resolving the footprints. Default `KiCAD-6`.
+  resolving the footprints. Default `KiCAD-base`.
 - `-p, --placeholders` Render placeholders to the board showing the component
   origins.
 - `m, --remap FILE` takes a path to a JSON file containing a dictionary from
@@ -99,24 +97,23 @@ The footprint library has a separate [documentation page](library.md).
 
 ## Rendering boards
 
-Board plotting is available under the `pcbdraw render <input_file> <output_file>`
-command. The output file can by any of the `.jpg` or `.png`. The command
-has the following options:
+Board rendering is available under the `pcbdraw render <input_file> <output_file>`
+command. It uses `kicad-cli pcb render` to produce 3D images of the board. The
+output file should be `.png` (supports transparency) or `.jpg`. The command has
+the following options:
 
 - `--side [front|back]` Specify which side to render
-- `--padding INTEGER` Image padding in millimeters
-- `-renderer [raytrace|normal]` Specify what renderer to use
+- `--renderer [raytrace|normal]` Specify what renderer to use
 - `--projection [orthographic|perspective]` Specify projection
-- `--no-components` Disable component rendering
 - `--transparent` Make transparent background of the image
-- `--baseresolution INTEGER` Canvas size for the renderer; resulting boards is
-  roughly 2/3 of the resolution
-- `--bgcolor1 <INTEGER INTEGER INTEGER>` First background color
-- `--bgcolor2 <INTEGER INTEGER INTEGER>` Second background color
+- `--padding INTEGER` Padding around the board after cropping, in pixels
+- `--width INTEGER` Render canvas width in pixels (before cropping)
+- `--height INTEGER` Render canvas height in pixels (before cropping)
 
 The component 3D models are taken from the board settings and KiCAD parameters.
-The board thickness and color is also taken from the board file.
+The board thickness and color is also taken from the board file. The rendered
+image is automatically cropped to the board bounds.
 
-Note that rendering only works on Linux and it is relatively slow - getting the
-image can take between 10-120 seconds (based on the board complexity).
+Rendering works on all platforms where `kicad-cli` is available (Linux, macOS,
+Windows). Requires KiCAD 9 or newer.
 

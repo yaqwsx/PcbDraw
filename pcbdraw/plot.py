@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import decimal
+from copy import deepcopy
 import json
 import math
 import os
@@ -29,7 +30,7 @@ except ImportError:
 from pcbdraw.unit import read_resistance
 import svgpathtools # type: ignore
 from lxml import etree, objectify # type: ignore
-from pcbnewTransition import KICAD_VERSION, isV6, isV7, isV8, pcbnew # type: ignore
+import pcbnew  # type: ignore
 
 T = TypeVar("T")
 Numeric = Union[int, float]
@@ -41,7 +42,6 @@ PKG_BASE = os.path.dirname(__file__)
 
 etree.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
-LEGACY_KICAD = not isV6() and not isV7() and not isV8()
 
 default_style = {
     "copper": "#417e5a",
@@ -111,10 +111,7 @@ class SvgPathItem:
     def is_same(p1: Point, p2: Point) -> bool:
         dx = p1[0] - p2[0]
         dy = p1[1] - p2[1]
-        pseudo_distance = dx*dx + dy*dy
-        if isV7():
-            return pseudo_distance < 0.01 ** 2
-        return pseudo_distance < 100 ** 2
+        return dx*dx + dy*dy < 0.01 ** 2
 
     def format(self, first: bool) -> str:
         ret = ""
@@ -138,12 +135,12 @@ def matrix(data: List[List[Numeric]]) -> Matrix:
 def pseudo_distance(a: Point, b: Point) -> Numeric:
     return (a[0] - b[0])**2 + (a[1] - b[1])**2
 
-def distance(a: Point, b: Point) -> Numeric:
-    return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
 def get_closest(reference: Point, elems: List[Point]) -> int:
-    distances = [pseudo_distance(reference, x) for x in elems]
-    return int(np.argmin(distances))
+    try:
+        return elems.index(reference)
+    except ValueError:
+        return int(np.argmin([pseudo_distance(reference, x) for x in elems]))
 
 def extract_arg(args: List[Any], index: int, default: Any=None) -> Any:
     """
@@ -277,12 +274,6 @@ def find_data_file(name: str, extension: str, data_paths: List[str], subdir: Opt
             return fname
     return None
 
-def ki2dmil(val: int) -> float:
-    return val // 2540
-
-def dmil2ki(val: float) -> int:
-    return int(val * 2540)
-
 def ki2mm(val: int) -> float:
     return val / 1000000.0
 
@@ -380,6 +371,14 @@ def strip_style_svg(root: etree.Element, keys: List[str], forbidden_colors: List
                 key = key.strip()
                 val = val.strip()
                 styles[key] = val
+            # KiCAD 9+ uses "fill: none"/"stroke: none" instead of
+            # "fill-opacity:0.0". Convert to opacity for compatibility.
+            if styles.get("fill") == "none":
+                styles["fill-opacity"] = "0"
+                del styles["fill"]
+            if styles.get("stroke") == "none":
+                styles["stroke-opacity"] = "0"
+                del styles["stroke"]
             fill = styles.get("fill", "").lower()
             stroke = styles.get("stroke", "").lower()
             if fill in forbidden_colors or stroke in forbidden_colors:
@@ -393,9 +392,6 @@ def strip_style_svg(root: etree.Element, keys: List[str], forbidden_colors: List
     return root in elements_to_remove
 
 def empty_svg(**attrs: str) -> etree.ElementTree:
-    # The XML should be: <?xml version="1.0" standalone="no"?> but the newest
-    # version of etree doesn't support it. We should revert it once the fixed
-    # version of etree is widerly available.
     document = etree.ElementTree(etree.fromstring(
         """<?xml version="1.0"?>
         <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
@@ -419,7 +415,19 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
     for group in svg_elements:
         for svg_element in group:
             if svg_element.tag == "path":
-                elements.append(SvgPathItem(svg_element.attrib["d"]))
+                p = svg_element.attrib["d"]
+                # Handle closed polygon paths (KiCad 7.0.1+)
+                polygon = re.fullmatch(r"M ((\d+\.\d+),(\d+\.\d+) )+Z", p)
+                if polygon:
+                    polygon_pts = re.findall(r"(\d+\.\d+),(\d+\.\d+) ", p)
+                    start = polygon_pts[0]
+                    polygon_pts.append(polygon_pts[0])
+                    for end in polygon_pts[1:]:
+                        line_path = 'M'+start[0]+' '+start[1]+' L'+end[0]+' '+end[1]
+                        elements.append(SvgPathItem(line_path))
+                        start = end
+                else:
+                    elements.append(SvgPathItem(p))
             elif svg_element.tag == "circle":
                 # Convert circle to path
                 att = svg_element.attrib
@@ -590,7 +598,7 @@ def collect_holes(board: pcbnew.BOARD) -> List[Hole]:
                 orientation=pad.GetOrientation(),
                 drillsize=(drs.x, drs.y)
             ))
-    via_type = pcbnew.VIA if LEGACY_KICAD else pcbnew.PCB_VIA
+    via_type = pcbnew.PCB_VIA
     for track in board.GetTracks():
         if not isinstance(track, via_type):
             continue
@@ -693,18 +701,16 @@ class PlotSubstrate(PlotInterface):
                 position[0], position[1], -hole.orientation.AsDegrees())
 
     def _process_baselayer(self, name: str, source_filename: str) -> None:
+        board_polygon = get_board_polygon(
+            extract_svg_content(
+                read_svg_unique(source_filename, self._plotter.unique_prefix())))
+
         clipPath = self._plotter.get_def_slot(tag_name="clipPath", id="cut-off")
-        clipPath.append(
-            get_board_polygon(
-                extract_svg_content(
-                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        clipPath.append(board_polygon)
 
         layer = etree.SubElement(self._container, "g", id="substrate-"+name,
             style="fill:{0}; stroke:{0};".format(self._plotter.get_style(name)))
-        layer.append(
-            get_board_polygon(
-                extract_svg_content(
-                    read_svg_unique(source_filename, self._plotter.unique_prefix()))))
+        layer.append(deepcopy(board_polygon))
         for element in extract_svg_content(read_svg_unique(source_filename, self._plotter.unique_prefix())):
             # Forbidden colors = workaround - KiCAD plots vias white
             # See https://gitlab.com/kicad/code/kicad/-/issues/10491
@@ -1022,23 +1028,15 @@ class PcbPlotter():
         self.data_path: List[str] = [] # Base paths for libraries lookup
         self.libs: List[str] = [] # Names of available libraries
         self._libs_path: List[str] = []
-        self._svg_precision = 6 # The SVG precision for KiCAD 6 plotting
-        self._svg_divider = 1
+        self._svg_precision = 6
 
         self.style: Any = {}     # Color scheme
         self.margin: int = 0 # Margin of the resulting document
 
         self.yield_warning: Callable[[str, str], None] = lambda tag, msg: None # Handle warnings
 
-        if isV7():
-            self.ki2svg = self._ki2svg_v7
-            self.svg2ki = self._svg2ki_v7
-        elif isV6():
-            self.ki2svg = self._ki2svg_v6
-            self.svg2ki = self._svg2ki_v6
-        else:
-            self.ki2svg = self._ki2svg_v5
-            self.svg2ki = self._svg2ki_v5
+        self.ki2svg = self._ki2svg_v7
+        self.svg2ki = self._svg2ki_v7
 
     @property
     def svg_precision(self) -> int:
@@ -1053,7 +1051,6 @@ class PcbPlotter():
         if value > 6:
             value = 6
         self._svg_precision = value
-        self._svg_divider = 10 ** (6 - self.svg_precision)
 
     def plot(self) -> etree.ElementTree:
         """
@@ -1184,7 +1181,7 @@ class PcbPlotter():
 
     def get_style(self, *args: Union[str, int]) -> Any:
         try:
-            value = self.style
+            value: Any = self.style
             for key in args:
                 value = value[key]
             return value
@@ -1192,7 +1189,7 @@ class PcbPlotter():
             try:
                 value = default_style
                 for key in args:
-                    value = value[key]
+                    value = value[key]  # type: ignore[index]
                 return value
             except KeyError as e:
                 raise UserWarning(f"Invalid argument for get_style : {args[0]}, {args[1]}")
@@ -1210,16 +1207,10 @@ class PcbPlotter():
             popt.SetMirror(False)
             popt.SetSubtractMaskFromSilk(True)
             popt.SetDrillMarksType(0) # NO_DRILL_SHAPE
-            try:
+            if hasattr(popt, 'SetPlotOutlineMode'):
                 popt.SetPlotOutlineMode(False)
-            except:
-                # Method does not exist in older versions of KiCad
-                pass
             popt.SetTextMode(pcbnew.PLOT_TEXT_MODE_STROKE)
-            if isV6():
-                popt.SetSvgPrecision(self.svg_precision, False)
-            if isV7():
-                popt.SetSvgPrecision(self.svg_precision)
+            popt.SetSvgPrecision(self.svg_precision)
             for action in to_plot:
                 if len(action.layers) == 0:
                     continue
@@ -1236,27 +1227,6 @@ class PcbPlotter():
                 for svg_file in os.listdir(tmp):
                     if svg_file.endswith(f"-{action.name}.svg"):
                         action.action(action.name, os.path.join(tmp, svg_file))
-
-    def _ki2svg_v6(self, x: int) -> float:
-        """
-        Convert dimensions from KiCAD to SVG. This method assumes the dimensions
-        use self.svg_precision.
-        """
-        return x / self._svg_divider
-
-
-    def _svg2ki_v6(self, x: float) -> int:
-        """
-        Convert dimensions from SVG to KiCAD. This method assumes the dimensions
-        use self.svg_precision.
-        """
-        return int(x * self._svg_divider)
-
-    def _ki2svg_v5(self, x: int) -> float:
-        return ki2dmil(x)
-
-    def _svg2ki_v5(self, x: float) -> int:
-        return dmil2ki(x)
 
     def _svg2ki_v7(self, x: float) -> int:
         return int(pcbnew.FromMM(x))
