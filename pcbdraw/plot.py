@@ -1125,7 +1125,7 @@ class PcbPlotter():
             plotter.render(self)
         remove_empty_elems(self._document.getroot())
         remove_inkscape_annotation(self._document.getroot())
-        self._shrink_svg(self._document, self.margin)
+        self._shrink_svg(self._document, self.margin, self.render_back ^ self.mirror)
         return self._document
 
 
@@ -1296,7 +1296,7 @@ class PcbPlotter():
     def _ki2svg_v7(self, x: int) -> float:
         return float(pcbnew.ToMM(x))
 
-    def _shrink_svg(self, svg: etree.ElementTree, margin: int) -> None:
+    def _shrink_svg(self, svg: etree.ElementTree, margin: int, mirrored: bool = False) -> None:
         """
         Shrink the SVG canvas to the size of the drawing. Add margin in
         KiCAD units.
@@ -1317,13 +1317,15 @@ class PcbPlotter():
         if components is not None:
             paths += svgpathtools.document.flattened_paths(components)
         substrate = tree.find(".//*[@id='cut-off']")
+        substrate_paths = []
         if substrate is not None:
-            paths += svgpathtools.document.flattened_paths(substrate)
+            substrate_paths = svgpathtools.document.flattened_paths(substrate)
 
-        if len(paths) == 0:
+        if len(paths) == 0 and len(substrate_paths) == 0:
             return
-        bbox = paths[0].bbox()
-        for x in paths:
+        all_paths = paths + substrate_paths
+        bbox = all_paths[0].bbox()
+        for x in all_paths:
             b = x.bbox()
             if hack_is_valid_bbox(b):
                 bbox = b
@@ -1331,8 +1333,16 @@ class PcbPlotter():
         for x in paths:
             box = x.bbox()
             if not hack_is_valid_bbox(box):
-                # This is a hack due to instability in svpathtools
                 continue
+            bbox = merge_bbox(bbox, box)
+        for x in substrate_paths:
+            box = x.bbox()
+            if not hack_is_valid_bbox(box):
+                continue
+            if mirrored:
+                # The substrate is in <defs> and not affected by the group
+                # scale(-1,1) transform, so mirror its x-range to match.
+                box = (-box[1], -box[0], box[2], box[3])
             bbox = merge_bbox(bbox, box)
         bbox = list(bbox)
         bbox[0] -= self.ki2svg(margin)
