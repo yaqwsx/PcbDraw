@@ -6,6 +6,7 @@ from lxml import etree
 
 from pcbdraw.plot import (
     SvgPathItem,
+    PointIndex,
     get_board_polygon,
     get_closest,
     pseudo_distance,
@@ -79,6 +80,110 @@ class TestGetClosest:
     def test_closest_by_distance(self):
         pts = [(0, 0), (10, 10), (2, 2)]
         assert get_closest((3, 3), pts) == 2
+
+
+class TestPointIndex:
+    def _seg(self, sx, sy, ex, ey):
+        return SvgPathItem(f"M {sx} {sy} L {ex} {ey}")
+
+    def test_has_active_initial(self):
+        idx = PointIndex([self._seg(0, 0, 1, 1)])
+        assert idx.has_active()
+
+    def test_has_active_after_pop(self):
+        idx = PointIndex([self._seg(0, 0, 1, 1)])
+        idx.pop_first_active()
+        assert not idx.has_active()
+
+    def test_pop_first_active_returns_first(self):
+        s1 = self._seg(0, 0, 1, 1)
+        s2 = self._seg(2, 2, 3, 3)
+        idx = PointIndex([s1, s2])
+        result = idx.pop_first_active()
+        assert result is s1
+
+    def test_find_by_end_exact(self):
+        s1 = self._seg(0, 0, 5, 5)
+        s2 = self._seg(10, 10, 20, 20)
+        idx = PointIndex([s1, s2])
+        result = idx.find_by_end((5.0, 5.0))
+        assert result is s1
+
+    def test_find_by_start_exact(self):
+        s1 = self._seg(0, 0, 5, 5)
+        s2 = self._seg(10, 10, 20, 20)
+        idx = PointIndex([s1, s2])
+        result = idx.find_by_start((10.0, 10.0))
+        assert result is s2
+
+    def test_find_by_end_approximate(self):
+        s1 = self._seg(0, 0, 5.0, 5.0)
+        idx = PointIndex([s1])
+        result = idx.find_by_end((5.005, 5.005))
+        assert result is s1
+
+    def test_find_by_start_approximate(self):
+        s1 = self._seg(5.0, 5.0, 10, 10)
+        idx = PointIndex([s1])
+        result = idx.find_by_start((5.005, 5.005))
+        assert result is s1
+
+    def test_find_no_match_returns_none(self):
+        s1 = self._seg(0, 0, 1, 1)
+        idx = PointIndex([s1])
+        assert idx.find_by_end((100.0, 100.0)) is None
+        assert idx.find_by_start((100.0, 100.0)) is None
+
+    def test_find_skips_used_elements(self):
+        s1 = self._seg(0, 0, 5, 5)
+        s2 = self._seg(10, 10, 5, 5)
+        idx = PointIndex([s1, s2])
+        first = idx.find_by_end((5.0, 5.0))
+        assert first is s1
+        second = idx.find_by_end((5.0, 5.0))
+        assert second is s2
+
+    def test_find_by_start_flipped(self):
+        s1 = self._seg(5, 5, 10, 10)
+        idx = PointIndex([s1])
+        result = idx.find_by_start_flipped((5.0, 5.0))
+        assert result is s1
+        assert s1.start == (10.0, 10.0)
+        assert s1.end == (5.0, 5.0)
+
+    def test_find_by_end_flipped(self):
+        s1 = self._seg(0, 0, 5, 5)
+        idx = PointIndex([s1])
+        result = idx.find_by_end_flipped((5.0, 5.0))
+        assert result is s1
+        assert s1.start == (5.0, 5.0)
+        assert s1.end == (0.0, 0.0)
+
+    def test_empty_index(self):
+        idx = PointIndex([])
+        assert not idx.has_active()
+        assert idx.find_by_end((0.0, 0.0)) is None
+        assert idx.find_by_start((0.0, 0.0)) is None
+
+    def test_all_consumed(self):
+        s1 = self._seg(0, 0, 1, 1)
+        s2 = self._seg(2, 2, 3, 3)
+        idx = PointIndex([s1, s2])
+        idx.pop_first_active()
+        idx.pop_first_active()
+        assert not idx.has_active()
+        assert idx.find_by_end((1.0, 1.0)) is None
+
+    def test_multiple_segments_same_endpoint(self):
+        s1 = self._seg(0, 0, 5, 5)
+        s2 = self._seg(1, 1, 5, 5)
+        s3 = self._seg(2, 2, 5, 5)
+        idx = PointIndex([s1, s2, s3])
+        r1 = idx.find_by_end((5.0, 5.0))
+        r2 = idx.find_by_end((5.0, 5.0))
+        r3 = idx.find_by_end((5.0, 5.0))
+        assert {id(r1), id(r2), id(r3)} == {id(s1), id(s2), id(s3)}
+        assert not idx.has_active()
 
 
 class TestUnitConversions:
