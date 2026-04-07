@@ -150,8 +150,8 @@ class PointIndex:
         self._elements = elements
         n = len(elements)
         self._active = np.ones(n, dtype=bool)
-        self._starts = np.array([(e.start[0], e.start[1]) for e in elements])
-        self._ends = np.array([(e.end[0], e.end[1]) for e in elements])
+        self._starts = np.array([(e.start[0], e.start[1]) for e in elements]) if n > 0 else np.empty((0, 2))
+        self._ends = np.array([(e.end[0], e.end[1]) for e in elements]) if n > 0 else np.empty((0, 2))
         self._start_index: Dict[Point, Set[int]] = defaultdict(set)
         self._end_index: Dict[Point, Set[int]] = defaultdict(set)
         for i, e in enumerate(elements):
@@ -405,7 +405,8 @@ def read_svg_unique(filename: str, prefix: str) -> etree.Element:
     return root
 
 def read_svg_unique2(filename: str, prefix: str) -> etree.Element:
-    root = etree.parse(filename).getroot()
+    parser = etree.XMLParser(huge_tree=True)
+    root = etree.parse(filename, parser).getroot()
     # We have to ensure all Ids in SVG are unique. Let's make it nasty by
     # collecting all ids and doing search & replace
     # Potentially dangerous (can break user text)
@@ -417,7 +418,7 @@ def read_svg_unique2(filename: str, prefix: str) -> etree.Element:
         content = f.read()
     for i in ids:
         content = content.replace("#"+i, "#" + prefix + i)
-    root = etree.fromstring(str.encode(content))
+    root = etree.fromstring(str.encode(content), parser)
     for el in root.getiterator():
         if "id" in el.attrib and el.attrib["id"] != "origin":
             el.attrib["id"] = prefix + el.attrib["id"]
