@@ -179,7 +179,7 @@ class PointIndex:
     def find_by_end_flipped(self, ref: Point) -> Optional[SvgPathItem]:
         return self._take(ref, self._ends, self._end_index, flip=True)
 
-    def _take(self, ref: Point, points: np.ndarray,
+    def _take(self, ref: Point, points: "np.ndarray[Any, Any]",
               index: Dict[Point, Set[int]], flip: bool) -> Optional[SvgPathItem]:
         """Find an active element matching ref, mark it used, optionally flip."""
         i = self._find(ref, points, index)
@@ -190,7 +190,7 @@ class PointIndex:
             self._elements[i].flip()
         return self._elements[i]
 
-    def _find(self, ref: Point, points: np.ndarray,
+    def _find(self, ref: Point, points: "np.ndarray[Any, Any]",
               index: Dict[Point, Set[int]]) -> Optional[int]:
         # Fast path: exact dict lookup
         candidates = index.get(ref)
