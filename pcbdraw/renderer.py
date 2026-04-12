@@ -112,8 +112,6 @@ def renderBoard(
             "--quality", "high" if plan.raytraced else "basic",
         ]
 
-        # Render with an opaque background first so we can detect the board
-        # edges. For transparent output, we'll process later.
         if not plan.transparent:
             cmd += ["--background", "opaque"]
 
@@ -139,6 +137,11 @@ def renderBoard(
 
         image = Image.open(output).copy()
 
+    # Apply transparency before cropping so that _make_transparent can
+    # detect background pixels even when padding is zero.
+    if plan.transparent:
+        image = _make_transparent(image)
+
     # Crop to board bounds
     bbox = _find_board_bbox(image)
     if bbox is not None:
@@ -149,8 +152,5 @@ def renderBoard(
         right = min(image.width, right + pad)
         bottom = min(image.height, bottom + pad)
         image = image.crop((left, top, right, bottom))
-
-    if plan.transparent:
-        image = _make_transparent(image)
 
     return image
