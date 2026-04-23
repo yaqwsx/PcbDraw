@@ -36,6 +36,8 @@ def read_resistance(value: str) -> Decimal:
                 # Then each gets multiplied by the factor and added, so 4000 + 700
                 # This method ensures that 4k7 and 4k700 for example yields the same result
                 split = p_value.split(prefix)
+                if len(split[0]) == 0 and len(split[1]) == 0:
+                    raise UserWarning("Empty resistance value after splitting by prefix")
                 n_whole = Decimal(split[0]) if split[0] != "" else Decimal(0)
                 n_dec = Decimal('.'+split[1]) if split[1] != "" else Decimal(0)
                 numerical_value = n_whole * table + n_dec * table
