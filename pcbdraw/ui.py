@@ -1,57 +1,48 @@
 import sys
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import Tuple, Optional, Any, List
 
 import click
 
+from .click_utils import report_kicad_cli_errors
 from .create_template import libtemplate
 
 from . import __version__
 from .convert import save
 from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
                    PlotSubstrate, PlotVCuts, ResistorValue, load_remapping,
-                   mm2ki)
+                   mm_to_internal)
 from .populate import populate
-from .pcbnew_common import fakeKiCADGui
+from .kicad_cli import (
+    LAYER_NAMES, KiCadCliError, canonical_layer, is_canonical_layer,
+)
 
 
-class Layer(IntEnum):
-    F_Cu = 0
-    B_Cu = 31
-    B_Adhes = 32
-    F_Adhes = 33
-    B_Paste = 34
-    F_Paste = 35
-    B_SilkS = 36
-    F_SilkS = 37
-    B_Mask = 38
-    F_Mask = 39
-    Dwgs_User = 40
-    Cmts_User = 41
-    Eco1_User = 42
-    Eco2_User = 43
-    Edge_Cuts = 44
-    Margin = 45
-    B_CrtYd = 46
-    F_CrtYd = 47
-    B_Fab = 48
-    F_Fab = 49
-
-class KiCADLayer(click.ParamType):
-    name = "KiCAD layer"
+class KiCadLayerParam(click.ParamType):
+    name = "KiCad layer"
 
     def convert(self, value: Any, param: Optional[click.Parameter],
-                ctx: Optional[click.Context]) -> Layer:
+                ctx: Optional[click.Context]) -> str:
         if isinstance(value, int):
-            if value in [item.value for item in Layer]:
-                return Layer(value)
-            return self.fail(f"{value!r} is not a valid layer number", param, ctx)
-        if isinstance(value, str):
             try:
-                return Layer[value.replace(".", "_")]
+                return canonical_layer(value)
+            except KiCadCliError:
+                return self.fail(f"{value!r} is not a valid layer number", param, ctx)
+        if isinstance(value, str):
+            if value.isdigit():
+                return self.convert(int(value), param, ctx)
+            layer = canonical_layer(value)
+            if is_canonical_layer(layer):
+                return layer
+            try:
+                legacy_number = {
+                    name.replace(".", "_"): number
+                    for number, name in LAYER_NAMES.items()
+                }[value]
+                return canonical_layer(legacy_number)
             except KeyError:
-                return self.fail(f"{value!r} is not a valid layer name", param, ctx)
+                pass
+            return self.fail(f"{value!r} is not a valid layer name", param, ctx)
         return self.fail(f"{value!r} is not of expected type", param, ctx)
 
 class CommaList(click.ParamType):
@@ -101,7 +92,7 @@ class WarningStderrReporter:
     help="Comma separated list of components to highlight")
 @click.option("--filter", "-f", type=CommaList(), default=None,
     help="Comma separated list of components to show, if not specified, show all")
-@click.option("--vcuts", "-v", type=KiCADLayer(), default=None,
+@click.option("--vcuts", "-v", type=KiCadLayerParam(), default=None,
     help="If layer specified, renders V-cuts from it")
 @click.option("--dpi", type=int, default=300,
     help="DPI for bitmap output")
@@ -125,6 +116,7 @@ class WarningStderrReporter:
     help="Outline width in mm")
 @click.option("--show-lib-paths", is_flag=True,
     help="Show library paths and quit")
+@report_kicad_cli_errors
 def plot(input: str, output: str, style: Optional[str], libs: List[str],
          placeholders: bool, remap: str, drill_holes: bool, side: str,
          mirror: bool, highlight: List[str], filter: Optional[List[str]],
@@ -134,8 +126,6 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     """
     Create a stylized drawing of the PCB.
     """
-
-    app = fakeKiCADGui()
 
     plotter = PcbPlotter(input)
     plotter.setup_arbitrary_data_path(".")
@@ -149,14 +139,7 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     plotter.libs = libs
     plotter.render_back = side == "back"
     plotter.mirror = mirror
-    plotter.margin = mm2ki(margin)
-
-    # KiCAD 6 uses the default precision 6 which makes the images not
-    # displayable by common web-browsers. Lowering the precision to 5 helps.
-    # Since there's not much of a point of using lower resolution, we hard-code
-    # the resolution for UI in order to make it clean. It is, however, still
-    # configurable when it is used via via API.
-    plotter.svg_precision = 5
+    plotter.margin = mm_to_internal(margin)
 
     if show_lib_paths:
         print_lib_paths(plotter)
@@ -168,7 +151,7 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     plotter.plot_plan = [PlotSubstrate(
                             drill_holes=drill_holes,
                             copper=copper,
-                            outline_width=mm2ki(outline_width))]
+                            outline_width=mm_to_internal(outline_width))]
     if paste:
         plotter.plot_plan.append(PlotPaste())
     if vcuts is not None:
@@ -257,6 +240,7 @@ def print_lib_paths(plotter: PcbPlotter) -> None:
     help="Render canvas width in pixels (before cropping)")
 @click.option("--height", type=int, default=900,
     help="Render canvas height in pixels (before cropping)")
+@report_kicad_cli_errors
 def render(input: str, output: str, side: str, renderer: str, projection: str,
            transparent: bool, padding: int, width: int, height: int) -> None:
     """
@@ -280,7 +264,7 @@ def render(input: str, output: str, side: str, renderer: str, projection: str,
 @click.version_option(__version__)
 def run() -> None:
     """
-    PcbDraw generates images of KiCAD PCBs
+    PcbDraw generates images of KiCad PCBs
     """
     pass
 

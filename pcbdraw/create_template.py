@@ -1,174 +1,180 @@
 #!/usr/bin/env python3
 
-from typing import BinaryIO, Callable, Union
-import pcbnew  # type: ignore
-import click
-import os
+from __future__ import annotations
+
+import re
+import tempfile
 from pathlib import Path
+from typing import BinaryIO, Dict, Tuple, Union
 
-from lxml import etree # type: ignore
-from .plot import PcbPlotter, PlotAction, PlotSubstrate, mm2ki
+import click
+from lxml import etree  # type: ignore
 
-def loadFootprint(footprintPath: Union[str, Path]) -> pcbnew.FOOTPRINT:
-    lib, foot = os.path.split(footprintPath)
-    foot, _ = os.path.splitext(foot)
-    return pcbnew.FootprintLoad(lib, foot)
+from .click_utils import report_kicad_cli_errors
+from .kicad_cli import (
+    FootprintSvgExport, export_footprint_svg, export_footprints_svg,
+)
+from .kicad_sexpr import normalize_embedded_footprint, top_level_forms
+from .plot import extract_svg_content, strip_style_svg
 
-def buildFootprintBoardFromFile(footprintPath: str) -> pcbnew.BOARD:
-    """
-    Given a path to kicad_mod file, build a single board with the component on
-    0,0 in the default orientation.
-    """
-    footprint = loadFootprint(footprintPath)
 
-    board = pcbnew.BOARD()
-    footprint.SetPosition(pcbnew.VECTOR2I(0, 0))
-    footprint.SetOrientationDegrees(0)
-    footprint.Reference().SetVisible(False)
-    footprint.Value().SetVisible(False)
-    board.Add(footprint)
-    return board
+TEMPLATE_STYLE = {
+    "copper": "#666666",
+    "crt": "#000000",
+    "fab": "#000000",
+    "cmt": "#000000",
+    "edge": "#000000",
+    "silk": "#61caff",
+}
 
-def buildFootprintBoardFromFootprint(footprint: pcbnew.FOOTPRINT) -> pcbnew.BOARD:
-    """
-    Given a footprint file, build a single board with the component on
-    0,0 in the default orientation.
-    """
-    try:
-        newFootprint = footprint.Duplicate()
-    except TypeError: # Footprint has overridden the method, cannot be called directly
-        newFootprint = pcbnew.Cast_to_BOARD_ITEM(footprint).Duplicate()
-    board = pcbnew.BOARD()
-    if newFootprint.GetLayer() == pcbnew.B_Cu:
-        newFootprint.Flip(pcbnew.VECTOR2I(0, 0), True)
-    newFootprint.SetPosition(pcbnew.VECTOR2I(0, 0))
-    newFootprint.SetOrientationDegrees(0)
-    board.Add(newFootprint)
-    return board
+FRONT_LAYERS = {
+    "F.Cu": "copper",
+    "F.Courtyard": "crt",
+    "F.Fab": "fab",
+    "User.Comments": "cmt",
+    "Edge.Cuts": "edge",
+    "F.Silkscreen": "silk",
+}
 
-class PlotComponentTopLayers(PlotSubstrate):
-    def render(self, plotter: PcbPlotter) -> None:
-        self._plotter = plotter
+BACK_LAYERS = {
+    "B.Cu": "copper",
+    "B.Courtyard": "crt",
+    "B.Fab": "fab",
+    "User.Comments": "cmt",
+    "Edge.Cuts": "edge",
+    "B.Silkscreen": "silk",
+}
 
-        to_plot = [
-            PlotAction("copper", [pcbnew.F_Cu], self._process_layer),
-            PlotAction("crt", [pcbnew.F_CrtYd], self._process_layer),
-            PlotAction("fab", [pcbnew.F_Fab], self._process_layer),
-            PlotAction("cmt", [pcbnew.Cmts_User], self._process_layer),
-            PlotAction("edge", [pcbnew.Edge_Cuts], self._process_layer),
-            PlotAction("silk", [pcbnew.F_SilkS], self._process_layer)]
 
-        self._container = etree.Element("g", id="KiCAD footprint top")
-        self._plotter.execute_plot_plan(to_plot)
-        self._plotter.append_board_element(self._container)
+def _parse_svg(content: bytes) -> etree.Element:
+    return etree.fromstring(content, etree.XMLParser(huge_tree=True))
 
-class PlotComponentBottomLayers(PlotSubstrate):
-    def render(self, plotter: PcbPlotter) -> None:
-        self._plotter = plotter
 
-        to_plot = [
-            PlotAction("copper", [pcbnew.B_Cu], self._process_layer),
-            PlotAction("crt", [pcbnew.B_CrtYd], self._process_layer),
-            PlotAction("fab", [pcbnew.B_Fab], self._process_layer),
-            PlotAction("cmt", [pcbnew.Cmts_User], self._process_layer),
-            PlotAction("edge", [pcbnew.Edge_Cuts], self._process_layer),
-            PlotAction("silk", [pcbnew.B_SilkS], self._process_layer)]
+def _append_layer(document: etree.Element, content: bytes, name: str) -> None:
+    container = etree.SubElement(
+        document, "g", id=f"footprint-{name}",
+        style=f"fill:{TEMPLATE_STYLE[name]}; stroke:{TEMPLATE_STYLE[name]};",
+    )
+    for element in extract_svg_content(_parse_svg(content)):
+        if not strip_style_svg(element, ["fill", "stroke"], ["#ffffff"]):
+            container.append(element)
 
-        self._container = etree.Element("g", id="KiCAD footprint bottom")
-        self._plotter.execute_plot_plan(to_plot)
-        self._plotter.append_board_element(self._container)
 
-def addOrigin(document: etree.Element, ki2svg: Callable[[int], float]) -> None:
-    """
-    Add PcbDraw footprint origin to the module
-    """
-    origin = etree.Element("rect")
-    origin.attrib["id"] = "origin"
-    origin.attrib["fill"] = "red"
-    origin.attrib["width"] = str(ki2svg(mm2ki(1)))
-    origin.attrib["height"] = str(ki2svg(mm2ki(1)))
-    origin.attrib["x"] = "0"
-    origin.attrib["y"] = "0"
-
-    document.getroot().append(origin)
-
-def run_footprint_impl(footprint: Union[str, Path, pcbnew.FOOTPRINT],
-                       output: BinaryIO, front: bool, back: bool) -> None:
-    """
-    Create a template for footprint based on the KiCAD footprint file.
-    """
-    if isinstance(footprint, pcbnew.FOOTPRINT):
-        board = buildFootprintBoardFromFootprint(footprint)
-    else:
-        board = buildFootprintBoardFromFile(str(footprint))
-    plotter = PcbPlotter(board)
-    plotter.style = {
-        "copper": "#666666",
-        "crt": "#000000",
-        "fab": "#000000",
-        "cmt": "#000000",
-        "edge": "#000000",
-        "silk": "#61caff"
-    }
-    plotter.margin = 0
-    plotter.svg_precision = 5
-
-    plotter.plot_plan = []
+def run_footprint_impl(
+    footprint: Union[str, Path], output: BinaryIO, front: bool, back: bool
+) -> None:
+    """Create a drawing template from a standalone KiCad footprint."""
+    selected: Dict[str, str] = {}
     if front:
-        plotter.plot_plan.append(PlotComponentTopLayers())
+        selected.update(FRONT_LAYERS)
     if back:
-        plotter.plot_plan.append(PlotComponentBottomLayers())
+        selected.update(BACK_LAYERS)
+    exported = export_footprint_svg(str(footprint), selected)
+    _build_footprint_document(exported, selected).write(
+        output, xml_declaration=True, encoding="utf-8"
+    )
 
-    document = plotter.plot()
-    addOrigin(document, plotter.ki2svg)
-    document.write(output)
+
+def _build_footprint_document(
+    exported: FootprintSvgExport, selected: Dict[str, str]
+) -> etree.ElementTree:
+    marker = _parse_svg(exported.canvas)
+    root = etree.Element(
+        "svg", nsmap={None: "http://www.w3.org/2000/svg"}, version="1.1",
+        width=marker.attrib.get("width", "0mm"),
+        height=marker.attrib.get("height", "0mm"),
+        viewBox=marker.attrib.get("viewBox", "0 0 0 0"),
+    )
+    root.append(etree.Element("title"))
+    root[-1].text = "Footprint template generated by PcbDraw"
+    for layer, name in selected.items():
+        _append_layer(root, exported.layers[layer], name)
+
+    origin_x, origin_y = exported.origin
+    etree.SubElement(
+        root, "rect", id="origin", fill="red", width="1", height="1",
+        x=str(origin_x), y=str(origin_y),
+    )
+    return etree.ElementTree(root)
+
+
+def extract_board_footprints(board: str) -> Dict[Tuple[str, str], str]:
+    """Extract the last embedded instance of each footprint ID, matching legacy behavior."""
+    result: Dict[Tuple[str, str], str] = {}
+    version_match = re.search(r'\(kicad_pcb\s+\(version\s+(\d+)\)', board)
+    generator_match = re.search(r'\(generator_version\s+"([^"]+)"\)', board)
+    version = version_match.group(1) if version_match else "20231120"
+    generator_version = generator_match.group(1) if generator_match else "9.0"
+    for form in top_level_forms(board, "footprint"):
+        match = re.match(r'\(\s*footprint\s+"((?:\\.|[^"\\])*)"', form)
+        if match is None:
+            continue
+        identifier = re.sub(r'\\(["\\])', r'\1', match.group(1))
+        library, separator, name = identifier.partition(":")
+        if not separator:
+            library, name = "", library
+        form = (
+            form[:match.end()]
+            + f'\n\t\t(version {version})'
+            + '\n\t\t(generator "pcbdraw")'
+            + f'\n\t\t(generator_version "{generator_version}")'
+            + form[match.end():]
+        )
+        result[(library, name)] = normalize_embedded_footprint(form)
+    return result
+
 
 @click.command("footprint")
 @click.argument("footprint", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("output", type=click.File(mode="wb"))
-@click.option("--front/--no-front", default=True,
-    help="Render front size of the footprint")
-@click.option("--back/--no-back", default=False,
-    help="Render back size of the footprint")
-def run_footprint(footprint: click.Path, output: BinaryIO, front: bool, back: bool) -> None:
-    """
-    Create a template for footprint based on the KiCAD footprint file.
-    """
-    return run_footprint_impl(str(footprint), output, front, back)
+@click.option("--front/--no-front", default=True, help="Render front side of the footprint")
+@click.option("--back/--no-back", default=False, help="Render back side of the footprint")
+@report_kicad_cli_errors
+def run_footprint(footprint: str, output: BinaryIO, front: bool, back: bool) -> None:
+    run_footprint_impl(footprint, output, front, back)
+
 
 @click.command("board")
 @click.argument("board", type=click.Path(exists=True, file_okay=True, dir_okay=False))
 @click.argument("output", type=click.Path(exists=False, file_okay=False, dir_okay=True))
-def run_board(board: str, output: click.Path) -> None:
-    """
-    Create a whole library of templates for footprints on given board
-    """
-    boardObj = pcbnew.LoadBoard(board)
-    outdir = Path(str(output))
+@report_kicad_cli_errors
+def run_board(board: str, output: str) -> None:
+    """Create templates from the exact footprint instances embedded in a board."""
+    outdir = Path(output)
     outdir.mkdir(parents=True, exist_ok=True)
-    footprints = {
-        (str(f.GetFPID().GetLibNickname()), str(f.GetFPID().GetLibItemName())): f
-        for f in boardObj.GetFootprints()}
-    for (lib, name), f in footprints.items():
-        print(f"Plotting: {lib}:{name}")
-        libdir = outdir / lib
-        libdir.mkdir(exist_ok=True)
+    footprints = extract_board_footprints(Path(board).read_text(encoding="utf-8"))
+    with tempfile.TemporaryDirectory() as tmp:
+        sources = {}
+        keys = {}
+        for index, ((library_name, name), form) in enumerate(footprints.items()):
+            key = f"footprint_{index}"
+            footprint_file = Path(tmp) / f"{key}.kicad_mod"
+            footprint_file.write_text(form + "\n", encoding="utf-8")
+            sources[key] = str(footprint_file)
+            keys[key] = (library_name, name)
 
-        outFile = libdir / (name + ".svg")
-        with open(outFile, "wb") as out:
-            run_footprint_impl(f, out, front=True, back=False)
+        selected = dict(FRONT_LAYERS)
+        selected.update(BACK_LAYERS)
+        exports = export_footprints_svg(sources, selected)
+        for key, exported in exports.items():
+            library_name, name = keys[key]
+            print(f"Plotting: {library_name}:{name}")
+            libdir = outdir / library_name
+            libdir.mkdir(exist_ok=True)
+            with (libdir / f"{name}.svg").open("wb") as target:
+                _build_footprint_document(exported, FRONT_LAYERS).write(
+                    target, xml_declaration=True, encoding="utf-8"
+                )
+            with (libdir / f"{name}.back.svg").open("wb") as target:
+                _build_footprint_document(exported, BACK_LAYERS).write(
+                    target, xml_declaration=True, encoding="utf-8"
+                )
 
-        outFile = libdir / (name + ".back.svg")
-        with open(outFile, "wb") as out:
-            run_footprint_impl(f, out, front=False, back=True)
 
 @click.group()
 def libtemplate() -> None:
-    """
-    Create footprint templates
-    """
-    pass
+    """Create footprint drawing templates."""
+
 
 libtemplate.add_command(run_footprint)
 libtemplate.add_command(run_board)
-

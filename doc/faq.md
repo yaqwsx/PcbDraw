@@ -14,11 +14,14 @@ sudo apt install librsvg2-bin
 Alternatively, install Inkscape 1.x. Make sure the `inkscape` or `rsvg-convert`
 executable is in your PATH.
 
-## PcbDraw doesn't work with my KiCAD version
+## PcbDraw doesn't work with my KiCad version
 
-PcbDraw requires KiCAD 9 or newer. Older versions (v5, v6, v7, v8) are no
-longer supported. If you need support for older versions, use PcbDraw v1.1.x
-from PyPI.
+PcbDraw supports KiCad 9 and 10, following the policy of supporting the two
+latest KiCad releases. Older versions (v5, v6, v7, v8) are no longer supported.
+If you need support for older versions, use PcbDraw v1.1.x from PyPI.
+
+PcbDraw invokes `kicad-cli` and does not import the `pcbnew` Python module. If
+KiCad is installed outside `PATH`, set `KICAD_CLI` to the executable path.
 
 ## Component footprints are missing
 

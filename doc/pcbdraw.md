@@ -7,7 +7,7 @@ visualizations. There are two modes of drawing the boards:
   you have to supply hand-drawn footprint images. It can also remap symbols,
   easily select board style and also, render resistor values color bands.
 - rendering them. This invokes `kicad-cli pcb render` to produce a 3D image of
-  the board. Requires KiCAD 9 or newer.
+  the board. Requires a supported KiCad 9 or 10 installation.
 
 ## Plotting boards
 
@@ -115,5 +115,4 @@ The board thickness and color is also taken from the board file. The rendered
 image is automatically cropped to the board bounds.
 
 Rendering works on all platforms where `kicad-cli` is available (Linux, macOS,
-Windows). Requires KiCAD 9 or newer.
-
+Windows). Requires a supported KiCad 9 or 10 installation.

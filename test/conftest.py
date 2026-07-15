@@ -1,6 +1,10 @@
 import os
 import pytest
 
+from pcbdraw.kicad_cli import (
+    SUPPORTED_KICAD_MAJORS, find_kicad_cli, kicad_version,
+)
+
 TEST_DIR = os.path.dirname(__file__)
 RESOURCES_DIR = os.path.join(TEST_DIR, "resources")
 EXAMPLES_DIR = os.path.join(os.path.dirname(TEST_DIR), "examples")
@@ -11,20 +15,14 @@ def get_board_path(version: str) -> str:
 
 
 def _loadable_boards():
-    """Detect which boards can actually be loaded by the installed KiCAD."""
-    boards = []
-    for v in ["9", "10"]:
-        path = get_board_path(v)
-        if not os.path.isfile(path):
-            continue
-        try:
-            import pcbnew
-            b = pcbnew.LoadBoard(path)
-            if b is not None:
-                boards.append(v)
-        except Exception:
-            pass
-    return boards
+    """Select the fixture matching the installed kicad-cli major version."""
+    try:
+        find_kicad_cli()
+        major = str(kicad_version()[0])
+    except RuntimeError:
+        return []
+    supported = {str(version) for version in SUPPORTED_KICAD_MAJORS}
+    return [major] if major in supported and os.path.isfile(get_board_path(major)) else []
 
 
 AVAILABLE_BOARDS = _loadable_boards()

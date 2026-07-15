@@ -1,22 +1,17 @@
-"""
-3D board rendering using kicad-cli.
-
-Replaces the old GUI-automation approach (xvfb + xdotool + pcbnew).
-Requires KiCAD 9+ which ships kicad-cli with `pcb render` support.
-"""
+"""3D board rendering through ``kicad-cli pcb render``."""
 
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Tuple
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
+
+from .kicad_cli import KiCadCliError, run_kicad_cli
 
 
 class Side(Enum):
@@ -27,27 +22,12 @@ class Side(Enum):
 @dataclass
 class RenderAction:
     side: Side = Side.FRONT
-    components: bool = True
     raytraced: bool = False
     orthographic: bool = True
     transparent: bool = False
     padding: int = 30  # pixels of padding around the board after crop
     width: int = 1600
     height: int = 900
-
-
-def _find_kicad_cli() -> str:
-    """Find the kicad-cli executable."""
-    path = shutil.which("kicad-cli")
-    if path is not None:
-        return path
-    for candidate in ["/usr/bin/kicad-cli", "/usr/local/bin/kicad-cli"]:
-        if os.path.isfile(candidate):
-            return candidate
-    raise RuntimeError(
-        "kicad-cli not found. Please install KiCAD 9 or newer.\n"
-        "kicad-cli is required for 3D rendering."
-    )
 
 
 def _find_board_bbox(image: Image.Image) -> Optional[Tuple[int, int, int, int]]:
@@ -91,20 +71,18 @@ def renderBoard(
     plan: RenderAction,
 ) -> Image.Image:
     """
-    Render a KiCAD board to a PNG image using kicad-cli.
+    Render a KiCad board to a PNG image using kicad-cli.
 
     The image is cropped to the board bounds with padding, matching the
     behavior of the old GUI-automation renderer.
 
     Returns a PIL Image.
     """
-    cli = _find_kicad_cli()
-
     with TemporaryDirectory() as tmp:
         output = os.path.join(tmp, "render.png")
 
         cmd: List[str] = [
-            cli, "pcb", "render",
+            "pcb", "render",
             "--output", output,
             "--side", plan.side.value,
             "--width", str(plan.width),
@@ -120,20 +98,10 @@ def renderBoard(
 
         cmd.append(boardFile)
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            timeout=300,
-        )
-
-        if result.returncode != 0:
-            stderr = result.stderr.decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"kicad-cli pcb render failed (exit code {result.returncode}):\n{stderr}"
-            )
+        run_kicad_cli(cmd, timeout=300)
 
         if not os.path.isfile(output):
-            raise RuntimeError("kicad-cli did not produce an output file")
+            raise KiCadCliError("kicad-cli did not produce a rendered image")
 
         image = Image.open(output).copy()
 

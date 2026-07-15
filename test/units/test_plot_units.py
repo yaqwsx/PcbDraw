@@ -10,10 +10,10 @@ from pcbdraw.plot import (
     get_board_polygon,
     get_closest,
     pseudo_distance,
-    ki2mm,
-    mm2ki,
+    internal_to_mm,
+    mm_to_internal,
     to_trans_matrix,
-    to_kicad_basic_units,
+    to_internal_units,
     load_style,
     merge_bbox,
     strip_style_svg,
@@ -187,20 +187,20 @@ class TestPointIndex:
 
 
 class TestUnitConversions:
-    def test_ki2mm(self):
-        assert ki2mm(1000000) == 1.0
+    def test_internal_to_mm(self):
+        assert internal_to_mm(1000000) == 1.0
 
-    def test_mm2ki(self):
-        assert mm2ki(1.0) == 1000000
+    def test_mm_to_internal(self):
+        assert mm_to_internal(1.0) == 1000000
 
     def test_roundtrip(self):
-        assert ki2mm(mm2ki(5.5)) == pytest.approx(5.5, abs=0.001)
+        assert internal_to_mm(mm_to_internal(5.5)) == pytest.approx(5.5, abs=0.001)
 
-    def test_to_kicad_basic_units_mm(self):
-        assert to_kicad_basic_units("1mm") == mm2ki(1.0)
+    def test_to_internal_units_mm(self):
+        assert to_internal_units("1mm") == mm_to_internal(1.0)
 
-    def test_to_kicad_basic_units_cm(self):
-        assert to_kicad_basic_units("1cm") == mm2ki(10.0)
+    def test_to_internal_units_cm(self):
+        assert to_internal_units("1cm") == mm_to_internal(10.0)
 
 
 class TestTransformMatrix:

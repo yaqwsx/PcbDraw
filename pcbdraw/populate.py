@@ -18,7 +18,6 @@ from mistune.plugins.footnotes import footnotes as plugin_footnotes
 from mistune.plugins.table import table as plugin_table
 from mistune.renderers.markdown import MarkdownRenderer
 
-from .pcbnew_common import fakeKiCADGui
 from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
@@ -328,8 +327,6 @@ def populate(input: str, output: str, board: Optional[str], imgname: Optional[st
     """
     Create assembly step-by-step guides
     """
-
-    app = fakeKiCADGui()
 
     data_path = get_data_path()
     try:

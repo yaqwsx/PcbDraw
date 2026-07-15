@@ -1,15 +1,15 @@
 # PcbDraw
 
-Convert your KiCAD boards into nice looking 2D drawings suitable for pinout
+Convert your KiCad boards into nice looking 2D drawings suitable for pinout
 diagrams. Never draw them manually again!
 
 ![example](promo_pcbdraw.png)
 
-This tool takes a KiCAD board (.kicad_pcb file) and produces a 2D
+This tool takes a KiCad board (.kicad_pcb file) and produces a 2D
 nice looking drawing of the board as an SVG file. This allows you to quickly and
 automatically create awesome pinout diagrams for your project. These diagrams
 are much easier to read than a labeled photo of a physical board or an actual
-KiCAD design.
+KiCad design.
 
 You and your users will love them!
 
@@ -23,9 +23,10 @@ previews of your boards (e.g., in CI).
 
 ## Installation
 
-PcbDraw requires **KiCAD 9 or newer** and is distributed as a Python package
-`pcbdraw`. It also requires Inkscape 1 or librsvg installed. Read more details
-in the [installation guide](doc/installation.md).
+PcbDraw supports **KiCad 9 and 10** and is distributed as a Python package
+`pcbdraw`. It uses the stable `kicad-cli` interface and does not depend on
+KiCad's Python `pcbnew` module. It also requires Inkscape 1 or librsvg installed.
+Read more details in the [installation guide](doc/installation.md).
 
 ## Usage
 

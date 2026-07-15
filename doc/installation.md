@@ -1,7 +1,9 @@
 # Installation
 
-PcbDraw is a stand-alone CLI tool. It is not an action plugin for KiCAD and
-therefore, it has no menu inside Pcbnew. PcbDraw requires **KiCAD 9 or newer**.
+PcbDraw is a stand-alone CLI tool. It is not an action plugin for KiCad and
+therefore, it has no menu inside the PCB Editor. PcbDraw supports **KiCad 9 and 10**.
+It communicates with KiCad through the `kicad-cli` executable and does not load
+the version-specific Python `pcbnew` module.
 
 ## Linux & MacOS
 
@@ -25,22 +27,24 @@ conversion from vector to raster images. The executables `inkscape` or
 variables `PCBDRAW_INKSCAPE` or `PCBDRAW_RSVG` with paths to the tools. If they
 are set, PcbDraw will use these paths.
 
+The `kicad-cli` executable must be available in `PATH`. For installations in a
+non-standard location, set `KICAD_CLI` to its full executable path.
+
 ## Windows
 
-On Windows, you have to install KiCAD 9 or newer and also Inkscape 1.x. PcbDraw
-doesn't work with Inkscape 0.9x. To install PcbDraw on Windows, you have to open
-"KiCAD Command Prompt". You can find it in the start menu:
+On Windows, install a supported KiCad release and Inkscape 1.x. PcbDraw doesn't work with
+Inkscape 0.9x. You can use an ordinary command prompt when `kicad-cli` is in
+`PATH`. Otherwise, use the "KiCad Command Prompt" from the start menu or set
+`KICAD_CLI` explicitly:
 
-![KiCAD Command Prompt in Start menu](resources/windowsCommandPrompt1.jpg)
+![KiCad Command Prompt in Start menu](resources/windowsCommandPrompt1.jpg)
 
 Once you have it open like this:
 
-![KiCAD Command Prompt in Start menu](resources/windowsCommandPrompt2.jpg)
+![KiCad Command Prompt in Start menu](resources/windowsCommandPrompt2.jpg)
 
-you can put command in there and confirm them by pressing enter. This is also
-the prompt from which you will invoke all PcbDraw's CLI commands. They,
-unfortunately, does not work in an ordinary Command prompt due to the way KiCAD
-is packaged on Windows.
+you can enter commands and confirm them by pressing Enter. Use that prompt when
+the normal command prompt cannot find `kicad-cli`.
 
 Then you have to enter:
 
@@ -56,8 +60,8 @@ pcbdraw --help
 
 You should get a help menu.
 
-All further invocations of PcbDraw have to be made from KiCAD Command Prompt,
-not the regular command prompt.
+PcbDraw itself can be installed into any normal Python environment; it no
+longer has to share KiCad's bundled Python environment.
 
 ## Docker
 
