@@ -246,10 +246,34 @@ class TestStripStyleSvg:
 
     def test_converts_fill_none_to_opacity(self):
         root = etree.fromstring('<g style="fill: none; stroke: none"></g>')
-        strip_style_svg(root, keys=[], forbidden_colors=[])
+        strip_style_svg(root, keys=["fill", "stroke"], forbidden_colors=[])
         style = root.attrib["style"]
         assert "fill-opacity: 0" in style
         assert "stroke-opacity: 0" in style
+
+    @pytest.mark.parametrize("paint", ["fill", "stroke"])
+    def test_visible_child_overrides_none_parent(self, paint):
+        root = etree.fromstring(
+            f'<g style="{paint}: NoNe">'
+            f'<path style="{paint}: #000000"/>'
+            '</g>'
+        )
+        strip_style_svg(root, keys=[paint], forbidden_colors=[])
+
+        assert f"{paint}-opacity: 0" in root.attrib["style"]
+        assert f"{paint}-opacity: 1" in root[0].attrib["style"]
+        assert paint not in root[0].attrib["style"].replace(f"{paint}-opacity", "")
+
+    def test_visible_child_preserves_inherited_opacity(self):
+        root = etree.fromstring(
+            '<g style="fill: none; fill-opacity: 0.4">'
+            '<path style="fill: #000000"/>'
+            '</g>'
+        )
+        strip_style_svg(root, keys=["fill"], forbidden_colors=[])
+
+        assert "fill-opacity: 0" in root.attrib["style"]
+        assert "fill-opacity: 0.4" in root[0].attrib["style"]
 
 
 class TestMakeXMLIdentifier:

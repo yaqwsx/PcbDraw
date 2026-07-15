@@ -433,35 +433,75 @@ def extract_svg_content(root: etree.Element) -> List[etree.Element]:
 
 def strip_style_svg(root: etree.Element, keys: List[str], forbidden_colors: List[str]) -> bool:
     elements_to_remove = []
-    for el in root.getiterator():
+    normalized_forbidden_colors = {color.lower() for color in forbidden_colors}
+
+    def process_element(el: etree.Element, inherited_opacity: Dict[str, str],
+                        inherited_suppression: Dict[str, bool]) -> None:
+        effective_opacity = dict(inherited_opacity)
+        suppression = dict(inherited_suppression)
+
         if "style" in el.attrib:
             s = el.attrib["style"].strip().split(";")
-            styles = {}
+            styles: Dict[str, str] = {}
             for x in s:
                 if len(x) == 0:
                     continue
-                key, val = tuple(x.split(":"))
+                key, val = tuple(x.split(":", 1))
                 key = key.strip()
                 val = val.strip()
                 styles[key] = val
-            # KiCAD 9+ uses "fill: none"/"stroke: none" instead of
-            # "fill-opacity:0.0". Convert to opacity for compatibility.
-            if styles.get("fill") == "none":
-                styles["fill-opacity"] = "0"
-                del styles["fill"]
-            if styles.get("stroke") == "none":
-                styles["stroke-opacity"] = "0"
-                del styles["stroke"]
+
             fill = styles.get("fill", "").lower()
             stroke = styles.get("stroke", "").lower()
-            if fill in forbidden_colors or stroke in forbidden_colors:
+            if fill in normalized_forbidden_colors or stroke in normalized_forbidden_colors:
                 elements_to_remove.append(el)
+
+            for paint in ("fill", "stroke"):
+                opacity = f"{paint}-opacity"
+                if opacity in styles:
+                    effective_opacity[paint] = styles[opacity]
+
+                if paint not in keys:
+                    suppression[paint] = False
+                    continue
+
+                value = styles.get(paint)
+                normalized_value = value.lower() if value is not None else None
+                if normalized_value == "none":
+                    # KiCAD 9+ uses "fill: none"/"stroke: none" instead of
+                    # zero opacity. Removing the paint property would make the
+                    # element inherit the layer color, so preserve its absence
+                    # through opacity instead.
+                    styles[opacity] = "0"
+                    del styles[paint]
+                    suppression[paint] = True
+                elif value is not None:
+                    del styles[paint]
+                    if inherited_suppression[paint] and opacity not in styles:
+                        # A visible child can override a parent's "none" paint.
+                        # Reset the zero opacity introduced on the parent to the
+                        # opacity the child inherited in the source SVG.
+                        styles[opacity] = effective_opacity[paint]
+                    suppression[paint] = False
+
             el.attrib["style"] = ";" \
                 .join([f"{key}: {val}" for key, val in styles.items() if key not in keys]) \
                 .replace("  ", " ") \
                 .strip()
+
+        for child in el:
+            process_element(child, effective_opacity, suppression)
+
+    process_element(
+        root,
+        inherited_opacity={"fill": "1", "stroke": "1"},
+        inherited_suppression={"fill": False, "stroke": False},
+    )
+
     for el in elements_to_remove:
-        el.getparent().remove(el)
+        parent = el.getparent()
+        if parent is not None:
+            parent.remove(el)
     return root in elements_to_remove
 
 def empty_svg(**attrs: str) -> etree.ElementTree:
@@ -1321,20 +1361,12 @@ class PcbPlotter():
         if substrate is not None:
             substrate_paths = svgpathtools.document.flattened_paths(substrate)
 
-        if len(paths) == 0 and len(substrate_paths) == 0:
-            return
-        all_paths = paths + substrate_paths
-        bbox = all_paths[0].bbox()
-        for x in all_paths:
-            b = x.bbox()
-            if hack_is_valid_bbox(b):
-                bbox = b
-                break
+        boxes = []
         for x in paths:
             box = x.bbox()
             if not hack_is_valid_bbox(box):
                 continue
-            bbox = merge_bbox(bbox, box)
+            boxes.append(box)
         for x in substrate_paths:
             box = x.bbox()
             if not hack_is_valid_bbox(box):
@@ -1343,6 +1375,12 @@ class PcbPlotter():
                 # The substrate is in <defs> and not affected by the group
                 # scale(-1,1) transform, so mirror its x-range to match.
                 box = (-box[1], -box[0], box[2], box[3])
+            boxes.append(box)
+
+        if len(boxes) == 0:
+            return
+        bbox = boxes[0]
+        for box in boxes[1:]:
             bbox = merge_bbox(bbox, box)
         bbox = list(bbox)
         bbox[0] -= self.ki2svg(margin)
@@ -1391,4 +1429,3 @@ class PcbPlotter():
         self._board_cont.attrib["id"] = "boardContainer"
         self._comp_cont.attrib["id"] = "componentContainer"
         self._high_cont.attrib["id"] = "highlightContainer"
-

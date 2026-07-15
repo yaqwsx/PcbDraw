@@ -69,12 +69,27 @@ class TestPlotSVG:
                output.stat().st_size > 0  # fallback: at least file was created
 
     def test_plot_no_components(self, board_path, tmp_path):
-        output = tmp_path / "output.svg"
-        result = subprocess.run(
-            ["pcbdraw", "plot", "--no-components", board_path, str(output)],
-            capture_output=True, timeout=120,
-        )
-        assert result.returncode == 0, f"stderr: {result.stderr.decode()}"
+        outputs = {}
+        for side in ("front", "back"):
+            output = tmp_path / f"output-{side}.svg"
+            result = subprocess.run(
+                ["pcbdraw", "plot", "--no-components", "--side", side,
+                 board_path, str(output)],
+                capture_output=True, timeout=120,
+            )
+            assert result.returncode == 0, f"stderr: {result.stderr.decode()}"
+            outputs[side] = etree.parse(str(output)).getroot()
+
+        front = outputs["front"]
+        back = outputs["back"]
+        assert float(back.attrib["width"].removesuffix("mm")) == pytest.approx(
+            float(front.attrib["width"].removesuffix("mm")))
+        assert float(back.attrib["height"].removesuffix("mm")) == pytest.approx(
+            float(front.attrib["height"].removesuffix("mm")))
+
+        front_viewbox = [float(value) for value in front.attrib["viewBox"].split()]
+        back_viewbox = [float(value) for value in back.attrib["viewBox"].split()]
+        assert back_viewbox[2:] == pytest.approx(front_viewbox[2:])
 
     def test_plot_mirror(self, board_path, tmp_path):
         output = tmp_path / "output.svg"
