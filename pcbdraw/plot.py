@@ -996,11 +996,18 @@ class PlotComponents(PlotInterface):
             return
         try:
             res, tolerance = self._get_resistance_from_value(value)
-            power = math.floor(res.log10()) - 1
-            res = Decimal(int(float(res) / 10 ** power))
+            if res < 0:
+                raise UserWarning(f"Invalid resistor value {value}")
+            if res == 0:
+                power = 0
+                digits = (0, 0)
+            else:
+                power = math.floor(res.log10()) - 1
+                significant = int(res.scaleb(-power))
+                digits = divmod(significant, 10)
             resistor_colors = [
-                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[0])),
-                self._plotter.get_style("tht-resistor-band-colors", int(str(res)[1])),
+                self._plotter.get_style("tht-resistor-band-colors", digits[0]),
+                self._plotter.get_style("tht-resistor-band-colors", digits[1]),
                 self._plotter.get_style("tht-resistor-band-colors", int(power)),
                 self._plotter.get_style("tht-resistor-band-colors", tolerance)
             ]

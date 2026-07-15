@@ -19,6 +19,8 @@ from pcbdraw.plot import (
     strip_style_svg,
     extract_svg_content,
     make_XML_identifier,
+    PlotComponents,
+    default_style,
 )
 
 
@@ -282,6 +284,63 @@ class TestMakeXMLIdentifier:
 
     def test_strips_leading_digits(self):
         assert make_XML_identifier("123abc") == "abc"
+
+
+class ResistorStylePlotter:
+    def __init__(self):
+        self.warnings = []
+
+    def get_style(self, *keys):
+        value = default_style
+        for key in keys:
+            value = value[key]
+        return value
+
+    def yield_warning(self, warning_type, message):
+        self.warnings.append((warning_type, message))
+
+
+class TestResistorColorCode:
+    @staticmethod
+    def _bands():
+        root = etree.Element("g")
+        for index in range(1, 5):
+            etree.SubElement(
+                root,
+                "rect",
+                id=f"res_band{index}",
+                style="display:none;fill:#ffffff",
+            )
+        return root
+
+    def test_zero_ohm_resistor(self):
+        plotter = ResistorStylePlotter()
+        components = PlotComponents()
+        components._plotter = plotter
+        root = self._bands()
+
+        components._apply_resistor_code(root, "", "R1", "0R")
+
+        expected_colors = ["#000000", "#000000", "#000000", "#ffc800"]
+        for index, color in enumerate(expected_colors, start=1):
+            style = root.find(f".//*[@id='res_band{index}']").attrib["style"]
+            assert "display:inline" in style
+            assert f"fill:{color}" in style
+        assert plotter.warnings == []
+
+    def test_bare_unit_is_reported_as_invalid(self):
+        plotter = ResistorStylePlotter()
+        components = PlotComponents()
+        components._plotter = plotter
+        root = self._bands()
+
+        components._apply_resistor_code(root, "", "R1", "R")
+
+        assert plotter.warnings == [
+            ("resistor", "Cannot color-code resistor R1: Invalid resistor value R")
+        ]
+        for band in root:
+            assert "display:none" in band.attrib["style"]
 
 
 class TestGetBoardPolygon:

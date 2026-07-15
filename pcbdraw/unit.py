@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import List
 
 
@@ -20,6 +20,9 @@ def read_resistance(value: str) -> Decimal:
     """
     p_value = erase(value, ["Ω", "Ohms", "Ohm"]).strip()
     p_value = p_value.replace(" ", "") # Sometimes there are spaces after decimal place
+    if not any(character.isdigit() for character in p_value):
+        raise ValueError(f"Cannot parse '{value}' to resistance")
+
     unit_prefixes = {
         "m": Decimal('1e-3'),
         "R": Decimal('1'),
@@ -41,9 +44,8 @@ def read_resistance(value: str) -> Decimal:
                 numerical_value = n_whole * table + n_dec * table
                 break
         if numerical_value is None:
-            # If this fails, a decimal.InvalidOperation is raised which is handled by the Exception catch
+            # Invalid decimal strings are reported as invalid resistance values below.
             numerical_value = Decimal(p_value)
         return numerical_value
-    except Exception:
-        pass
-    raise ValueError(f"Cannot parse '{value}' to resistance")
+    except InvalidOperation as e:
+        raise ValueError(f"Cannot parse '{value}' to resistance") from e
