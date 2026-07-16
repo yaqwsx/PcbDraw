@@ -9,9 +9,9 @@ from .create_template import libtemplate
 
 from . import __version__
 from .convert import save
-from .plot import (PcbPlotter, PlotComponents, PlotPaste, PlotPlaceholders,
-                   PlotSubstrate, PlotVCuts, ResistorValue, load_remapping,
-                   mm_to_internal)
+from .plot import (BoardOutlineError, PcbPlotter, PlotComponents, PlotPaste,
+                   PlotPlaceholders, PlotSubstrate, PlotVCuts, ResistorValue,
+                   load_remapping, mm_to_internal)
 from .populate import populate
 from .kicad_cli import (
     LAYER_NAMES, KiCadCliError, canonical_layer, is_canonical_layer,
@@ -163,7 +163,10 @@ def plot(input: str, output: str, style: Optional[str], libs: List[str],
     if placeholders:
         plotter.plot_plan.append(PlotPlaceholders())
 
-    image = plotter.plot()
+    try:
+        image = plotter.plot()
+    except BoardOutlineError as error:
+        raise click.ClickException(str(error)) from error
 
     if werror and plotter.yield_warning.triggered:
         sys.exit("Warning treated as errors. See output above.")

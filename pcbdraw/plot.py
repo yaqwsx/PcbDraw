@@ -41,6 +41,10 @@ Point = Tuple[Numeric, Numeric]
 Box = Tuple[Numeric, Numeric, Numeric, Numeric]
 
 
+class BoardOutlineError(RuntimeError):
+    """Raised when Edge.Cuts does not describe closed board contours."""
+
+
 PKG_BASE = os.path.dirname(__file__)
 
 etree.register_namespace("xlink", "http://www.w3.org/1999/xlink")
@@ -524,8 +528,10 @@ def empty_svg(**attrs: str) -> etree.ElementTree:
 
 def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
     """
-    Try to connect independents segments on Edge.Cuts and form a polygon
-    return SVG path element with the polygon
+    Connect independent Edge.Cuts segments into closed board contours.
+
+    Malformed contours are rejected instead of being implicitly closed by the
+    SVG fill operation, which would produce a misleading board rendering.
     """
     elements = []
     path = ""
@@ -571,16 +577,27 @@ def get_board_polygon(svg_elements: etree.Element) -> etree.Element:
 
             e = index.find_by_start(outline[-1].end)
             if e is not None:
-                outline.insert(0, e)
+                outline.append(e)
                 continue
 
             e = index.find_by_end_flipped(outline[-1].end)
             if e is not None:
-                outline.insert(0, e)
+                outline.append(e)
                 continue
+
+        start = outline[0].start
+        end = outline[-1].end
+        if not SvgPathItem.is_same(start, end):
+            gap = math.sqrt(pseudo_distance(start, end))
+            raise BoardOutlineError(
+                "Board outline is not closed: "
+                f"{gap:.3f} mm gap between {end} and {start}"
+            )
 
         for i, x in enumerate(outline):
             path += x.format(first=(i == 0))
+    if not path:
+        raise BoardOutlineError("Board has no closed outline on Edge.Cuts")
     e = etree.Element("path", d=path, style="fill-rule: evenodd;")
     return e
 

@@ -5,6 +5,7 @@ import pytest
 from lxml import etree
 
 from pcbdraw.plot import (
+    BoardOutlineError,
     SvgPathItem,
     PointIndex,
     get_board_polygon,
@@ -350,12 +351,22 @@ class TestGetBoardPolygon:
         path = etree.SubElement(group, "path", d=path_d)
         return [group]
 
-    def test_simple_lines(self):
+    def test_rejects_open_contour(self):
         elements = self._wrap_svg("M 0 0 L 10 0")
         elements += self._wrap_svg("M 10 0 L 10 10")
+        with pytest.raises(BoardOutlineError, match="not closed.*14.142 mm gap"):
+            get_board_polygon(elements)
+
+    def test_connects_shuffled_and_reversed_segments(self):
+        elements = self._wrap_svg("M 10 10 L 10 0")
+        elements += self._wrap_svg("M 0 0 L 0 10")
+        elements += self._wrap_svg("M 10 0 L 0 0")
+        elements += self._wrap_svg("M 0 10 L 10 10")
+
         result = get_board_polygon(elements)
+
         assert result.tag == "path"
-        assert "d" in result.attrib
+        assert result.attrib["d"].count("L") == 4
 
     def test_closed_polygon_comma_separated(self):
         """KiCad 7.0.1+ emits closed polygon paths like 'M x,y x,y Z'."""
@@ -379,7 +390,9 @@ class TestGetBoardPolygon:
     def test_regular_line_not_treated_as_polygon(self):
         """M ... L ... paths should not be decomposed."""
         elements = self._wrap_svg("M 0 0 L 10 0")
+        elements += self._wrap_svg("M 10 0 L 0 0")
         result = get_board_polygon(elements)
         d = result.attrib["d"]
-        # Should contain exactly one M and one L from the original path
+        # The two source paths form one contour without polygon decomposition.
         assert d.count("M") == 1
+        assert d.count("L") == 2
