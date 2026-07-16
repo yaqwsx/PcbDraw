@@ -10,8 +10,8 @@ import os
 import re
 import sysconfig
 from dataclasses import dataclass, field
-from decimal import Decimal
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from decimal import Decimal, InvalidOperation
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple, Union
 
 import numpy as np
 # We import the typing under try-catch to allow runtime for systems that have
@@ -64,6 +64,7 @@ default_style = {
     "highlight-padding": 1.5,
     "highlight-offset": 0,
     "tht-resistor-band-colors": {
+        -3: '#ff69b4',
         -2: '#d9d9d9',
         -1: '#ffc800',
         0: '#000000',
@@ -78,10 +79,12 @@ default_style = {
         9: '#cccccc',
         '1%': '#805500',
         '2%': '#ff0000',
+        '0.05%': '#ff8000',
+        '0.02%': '#ffff00',
         '0.5%': '#00cc11',
         '0.25%': '#0000cc',
         '0.1%': '#cc00cc',
-        '0.05%': '#666666',
+        '0.01%': '#666666',
         '5%': '#ffc800',
         '10%': '#d9d9d9',
     }
@@ -724,6 +727,43 @@ class ResistorValue:
     flip_bands: bool=False
 
 
+@dataclass(frozen=True)
+class ResistorColorCode:
+    band_count: int
+    colors: Tuple[Union[int, str], ...]
+
+
+def resistor_color_code(
+    resistance: Decimal, tolerance: str
+) -> ResistorColorCode:
+    """Calculate standard color-band keys for a resistance and tolerance."""
+    if resistance < 0:
+        raise ValueError("resistance cannot be negative")
+    if resistance == 0:
+        return ResistorColorCode(1, (0,))
+
+    try:
+        tolerance_value = Decimal(tolerance.removesuffix("%"))
+    except (InvalidOperation, ValueError) as error:
+        raise ValueError(f"invalid resistor tolerance {tolerance}") from error
+
+    significant_count = 3 if tolerance_value <= 2 else 2
+    multiplier = resistance.adjusted() - significant_count + 1
+    significant = int(resistance.scaleb(-multiplier))
+    digits = tuple(
+        int(digit) for digit in f"{significant:0{significant_count}d}"
+    )
+    if len(digits) != significant_count or multiplier not in range(-3, 10):
+        raise ValueError(
+            f"resistance {resistance} is outside the supported color-code range"
+        )
+
+    colors: Tuple[Union[int, str], ...] = (*digits, multiplier)
+    if tolerance != "20%":
+        colors += (tolerance,)
+    return ResistorColorCode(significant_count + 2, colors)
+
+
 class PlotInterface:
     def render(self, plotter: PcbPlotter) -> None:
         raise NotImplementedError("Plot interface wasn't implemented")
@@ -905,8 +945,11 @@ class PlotComponents(PlotInterface):
         for component in plotter.components(invert_side=True):
             self._append_component(component, template_suffix=".back")
 
-    def _get_unique_name(self, lib: str, name: str, value: str) -> str:
-        return f"{self._prefix}_{lib}__{name}_{value}"
+    def _get_unique_name(
+        self, lib: str, name: str, value: str, properties: Mapping[str, str]
+    ) -> str:
+        tolerance = properties.get("tol", properties.get("tolerance", ""))
+        return f"{self._prefix}_{lib}__{name}_{value}_{tolerance}"
 
     def _append_component(
         self, component: Component, template_suffix: str = ""
@@ -915,6 +958,7 @@ class PlotComponents(PlotInterface):
         name = component.footprint + template_suffix
         ref = component.reference
         value = component.value
+        properties = component.properties
         if not self.filter(ref) or name == "":
             return
         # Override resistor values
@@ -925,13 +969,13 @@ class PlotComponents(PlotInterface):
 
         lib, name = self.remapping(ref, lib, name)
 
-        unique_name = self._get_unique_name(lib, name, value)
+        unique_name = self._get_unique_name(lib, name, value, properties)
         if unique_name in self._used_components:
             component_info = self._used_components[unique_name]
             component_element = etree.Element("use",
                 attrib={"{http://www.w3.org/1999/xlink}href": "#" + component_info.id})
         else:
-            ret = self._create_component(lib, name, ref, value)
+            ret = self._create_component(lib, name, ref, value, properties)
             if ret is None:
                 self._plotter.yield_warning("component", f"Component {lib}:{name} has no footprint.")
                 return
@@ -952,12 +996,17 @@ class PlotComponents(PlotInterface):
         if self.highlight(ref):
             self._build_highlight(component, component_info)
 
-    def _create_component(self, lib: str, name: str, ref: str, value: str) \
+    def _create_component(
+        self, lib: str, name: str, ref: str, value: str,
+        properties: Mapping[str, str],
+    ) \
                              -> Optional[Tuple[etree.Element, PlacedComponentInfo]]:
         f = self._plotter._get_model_file(lib, name)
         if f is None:
             return None
-        xml_id = make_XML_identifier(self._get_unique_name(lib, name, value))
+        xml_id = make_XML_identifier(
+            self._get_unique_name(lib, name, value, properties)
+        )
         component_element = etree.Element("g", attrib={"id": xml_id})
 
         svg_tree, id_prefix = read_svg_unique2(f, self._plotter.unique_prefix())
@@ -982,7 +1031,9 @@ class PlotComponents(PlotInterface):
             size=(to_internal_units(svg_tree.attrib["width"]),
                   to_internal_units(svg_tree.attrib["height"]))
         )
-        self._apply_resistor_code(component_element, id_prefix, ref, value)
+        self._apply_resistor_code(
+            component_element, id_prefix, ref, value, properties
+        )
         return component_element, component_info
 
     def _component_to_board_scale_and_offset(self, svg: etree.Element) \
@@ -1008,25 +1059,35 @@ class PlotComponents(PlotInterface):
             f"translate({-(info.origin[0] - info.svg_offset[0]) * info.scale[0]}, {-(info.origin[1] - info.svg_offset[1]) * info.scale[1]})"
         self._plotter.append_highlight_element(h)
 
-    def _apply_resistor_code(self, root: etree.Element, id_prefix: str, ref: str, value: str) -> None:
+    def _apply_resistor_code(
+        self, root: etree.Element, id_prefix: str, ref: str, value: str,
+        properties: Optional[Mapping[str, str]] = None,
+    ) -> None:
         if root.find(f".//*[@id='{id_prefix}res_band1']") is None:
             return
         try:
-            res, tolerance = self._get_resistance_from_value(value)
-            if res < 0:
-                raise UserWarning(f"Invalid resistor value {value}")
-            if res == 0:
-                power = 0
-                digits = (0, 0)
-            else:
-                power = math.floor(res.log10()) - 1
-                significant = int(res.scaleb(-power))
-                digits = divmod(significant, 10)
+            res, tolerance = self._get_resistance_from_value(
+                value, properties or {}
+            )
+            code = resistor_color_code(res, tolerance)
+            if code.band_count == 1:
+                zero_band = root.find(f".//*[@id='{id_prefix}res_zeroband']")
+                if zero_band is not None:
+                    self._set_resistor_band(zero_band, self._plotter.get_style(
+                        "tht-resistor-band-colors", 0))
+                    return
+                fallback = (0, 0, 0) if tolerance == "20%" \
+                    else (0, 0, 0, tolerance)
+                code = ResistorColorCode(4, fallback)
+
+            prefix = "res_5band" if code.band_count == 5 else "res_band"
+            if root.find(f".//*[@id='{id_prefix}{prefix}1']") is None:
+                raise UserWarning(
+                    f"component template does not support {code.band_count}-band codes"
+                )
             resistor_colors = [
-                self._plotter.get_style("tht-resistor-band-colors", digits[0]),
-                self._plotter.get_style("tht-resistor-band-colors", digits[1]),
-                self._plotter.get_style("tht-resistor-band-colors", int(power)),
-                self._plotter.get_style("tht-resistor-band-colors", tolerance)
+                self._plotter.get_style("tht-resistor-band-colors", color)
+                for color in code.colors
             ]
 
             if ref in self.resistor_values:
@@ -1034,43 +1095,62 @@ class PlotComponents(PlotInterface):
                     resistor_colors.reverse()
 
             for res_i, res_c in enumerate(resistor_colors):
-                band = root.find(f".//*[@id='{id_prefix}res_band{res_i+1}']")
-                s = band.attrib["style"].split(";")
-                for i in range(len(s)):
-                    if s[i].startswith('fill:'):
-                        s_split = s[i].split(':')
-                        s_split[1] = res_c
-                        s[i] = ':'.join(s_split)
-                    elif s[i].startswith('display:'):
-                        s_split = s[i].split(':')
-                        s_split[1] = 'inline'
-                        s[i] = ':'.join(s_split)
-                band.attrib["style"] = ";".join(s)
-        except UserWarning as e:
+                band = root.find(
+                    f".//*[@id='{id_prefix}{prefix}{res_i + 1}']"
+                )
+                assert band is not None
+                self._set_resistor_band(band, res_c)
+        except (UserWarning, ValueError) as e:
             self._plotter.yield_warning("resistor", f"Cannot color-code resistor {ref}: {e}")
             return
 
-    def _get_resistance_from_value(self, value: str) -> Tuple[Decimal, str]:
-        res, tolerance = None, "5%"
-        value_l = value.split(" ", maxsplit=1)
+    @staticmethod
+    def _set_resistor_band(band: etree.Element, color: str) -> None:
+        styles = dict(
+            entry.split(":", 1) for entry in band.attrib["style"].split(";")
+            if entry
+        )
+        styles["fill"] = color
+        styles["display"] = "inline"
+        band.attrib["style"] = ";".join(
+            f"{key}:{value}" for key, value in styles.items()
+        )
+
+    def _get_resistance_from_value(
+        self, value: str, properties: Optional[Mapping[str, str]] = None
+    ) -> Tuple[Decimal, str]:
+        normalized_properties = {
+            name.lower(): property_value
+            for name, property_value in (properties or {}).items()
+        }
+        tolerance = normalized_properties.get(
+            "tol", normalized_properties.get("tolerance")
+        )
+        match = re.search(
+            r"(?:^|[\s,;])(\d+(?:\.\d+)?\s*%)\s*$", value
+        )
+        resistance_value = value
+        if match is not None:
+            if tolerance is None:
+                tolerance = match.group(1).replace(" ", "")
+            resistance_value = value[:match.start()].rstrip(" ,;")
+        if tolerance is None:
+            tolerance = "5%"
+        tolerance = tolerance.strip().replace(" ", "")
+
         try:
-            res = read_resistance(value_l[0])
+            res = read_resistance(resistance_value)
         except ValueError:
-            raise UserWarning(f"Invalid resistor value {value_l[0]}")
-        if len(value_l) > 1:
-            t_string = value_l[1].strip().replace(" ", "")
-            if "%" in t_string:
-                s = self._plotter.get_style("tht-resistor-band-colors")
-                if not isinstance(s, dict):
-                    raise RuntimeError(f"Invalid style specified, tht-resistor-band-colors should be dictionary, got {type(s)}")
-                if t_string.strip() not in s:
-                    raise UserWarning(f"Invalid resistor tolerance {value_l[1]}")
-                tolerance = t_string
-            else:
-                try:
-                    res = read_resistance(value)
-                except ValueError:
-                    raise UserWarning(f"Invalid resistor value {value}")
+            raise UserWarning(f"Invalid resistor value {resistance_value}")
+
+        colors = self._plotter.get_style("tht-resistor-band-colors")
+        if not isinstance(colors, dict):
+            raise RuntimeError(
+                "Invalid style specified, tht-resistor-band-colors should be "
+                f"dictionary, got {type(colors)}"
+            )
+        if tolerance != "20%" and tolerance not in colors:
+            raise UserWarning(f"Invalid resistor tolerance {tolerance}")
         return res, tolerance
 
 

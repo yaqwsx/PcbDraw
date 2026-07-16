@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 import re
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Mapping, Optional, Tuple
 
 
 MM_PER_INCH = 25.4
@@ -52,6 +52,7 @@ class Component:
     position: Point
     rotation_degrees: float
     side: BoardSide
+    properties: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

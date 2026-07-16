@@ -165,6 +165,40 @@ def component_footprint_ids(document: str) -> Dict[str, Tuple[str, str]]:
     return result
 
 
+def component_properties(document: str) -> Dict[str, Dict[str, str]]:
+    """Return custom footprint properties indexed by component reference."""
+    result = {}
+    for footprint in top_level_forms(document, "footprint"):
+        properties = {}
+        for property_form in top_level_forms(footprint, "property"):
+            match = re.match(
+                r'\(property\s+"((?:\\.|[^"\\])*)"\s+"((?:\\.|[^"\\])*)"',
+                property_form,
+            )
+            if match is None:
+                continue
+            name = re.sub(r'\\(["\\])', r'\1', match.group(1))
+            value = re.sub(r'\\(["\\])', r'\1', match.group(2))
+            properties[name.lower()] = value
+        reference = properties.get("reference")
+        if reference is None:
+            for text_form in top_level_forms(footprint, "fp_text"):
+                match = re.match(
+                    r'\(fp_text\s+reference\s+(?:"((?:\\.|[^"\\])*)"|([^\s()]+))',
+                    text_form,
+                )
+                if match is not None:
+                    reference = match.group(1) or match.group(2)
+                    reference = re.sub(r'\\(["\\])', r'\1', reference)
+                    break
+        if reference is not None:
+            result[reference] = {
+                name: value for name, value in properties.items()
+                if name not in {"reference", "value", "footprint"}
+            }
+    return result
+
+
 def normalize_embedded_footprint(document: str) -> str:
     """Return a board footprint in front-side, zero-rotation library orientation.
 

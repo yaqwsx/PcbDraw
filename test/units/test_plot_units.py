@@ -1,5 +1,6 @@
 """Unit tests for pure functions in pcbdraw.plot (no KiCAD dependency)."""
 
+from decimal import Decimal
 import re
 import pytest
 from lxml import etree
@@ -21,7 +22,9 @@ from pcbdraw.plot import (
     extract_svg_content,
     make_XML_identifier,
     PlotComponents,
+    ResistorColorCode,
     default_style,
+    resistor_color_code,
 )
 
 
@@ -303,7 +306,7 @@ class ResistorStylePlotter:
 
 class TestResistorColorCode:
     @staticmethod
-    def _bands():
+    def _bands(extended=False):
         root = etree.Element("g")
         for index in range(1, 5):
             etree.SubElement(
@@ -312,22 +315,97 @@ class TestResistorColorCode:
                 id=f"res_band{index}",
                 style="display:none;fill:#ffffff",
             )
+        if extended:
+            for index in range(1, 6):
+                etree.SubElement(
+                    root,
+                    "rect",
+                    id=f"res_5band{index}",
+                    style="display:none;fill:#ffffff",
+                )
+            etree.SubElement(
+                root,
+                "rect",
+                id="res_zeroband",
+                style="display:none;fill:#ffffff",
+            )
         return root
+
+    @pytest.mark.parametrize(
+        ("resistance", "tolerance", "expected"),
+        [
+            ("4.7", "5%", ResistorColorCode(4, (4, 7, -1, "5%"))),
+            ("0.12", "5%", ResistorColorCode(4, (1, 2, -2, "5%"))),
+            ("0.01", "5%", ResistorColorCode(4, (1, 0, -3, "5%"))),
+            ("12.3", "1%", ResistorColorCode(5, (1, 2, 3, -1, "1%"))),
+            ("470", "20%", ResistorColorCode(4, (4, 7, 1))),
+            ("678.9e9", "0.25%", ResistorColorCode(5, (6, 7, 8, 9, "0.25%"))),
+        ],
+    )
+    def test_calculates_band_keys(self, resistance, tolerance, expected):
+        assert resistor_color_code(Decimal(resistance), tolerance) == expected
+
+    def test_rejects_unrepresentable_resistance(self):
+        with pytest.raises(ValueError, match="outside the supported"):
+            resistor_color_code(Decimal("0.001"), "5%")
 
     def test_zero_ohm_resistor(self):
         plotter = ResistorStylePlotter()
         components = PlotComponents()
         components._plotter = plotter
-        root = self._bands()
+        root = self._bands(extended=True)
 
         components._apply_resistor_code(root, "", "R1", "0R")
 
-        expected_colors = ["#000000", "#000000", "#000000", "#ffc800"]
-        for index, color in enumerate(expected_colors, start=1):
-            style = root.find(f".//*[@id='res_band{index}']").attrib["style"]
+        zero_style = root.find(".//*[@id='res_zeroband']").attrib["style"]
+        assert "display:inline" in zero_style
+        assert "fill:#000000" in zero_style
+        assert plotter.warnings == []
+
+    def test_precision_resistor_uses_five_bands(self):
+        plotter = ResistorStylePlotter()
+        components = PlotComponents()
+        components._plotter = plotter
+        root = self._bands(extended=True)
+
+        components._apply_resistor_code(
+            root, "", "R1", "12.3", {"tolerance": "1%"}
+        )
+
+        expected = ["#805500", "#ff0000", "#ff8000", "#ffc800", "#805500"]
+        for index, color in enumerate(expected, start=1):
+            style = root.find(f".//*[@id='res_5band{index}']").attrib["style"]
             assert "display:inline" in style
             assert f"fill:{color}" in style
         assert plotter.warnings == []
+
+    def test_twenty_percent_has_no_tolerance_band(self):
+        plotter = ResistorStylePlotter()
+        components = PlotComponents()
+        components._plotter = plotter
+        root = self._bands()
+
+        components._apply_resistor_code(root, "", "R1", "470 20%")
+
+        for index in range(1, 4):
+            assert "display:inline" in root.find(
+                f".//*[@id='res_band{index}']"
+            ).attrib["style"]
+        assert "display:none" in root.find(
+            ".//*[@id='res_band4']"
+        ).attrib["style"]
+
+    def test_tolerance_field_overrides_value_suffix(self):
+        plotter = ResistorStylePlotter()
+        components = PlotComponents()
+        components._plotter = plotter
+
+        resistance, tolerance = components._get_resistance_from_value(
+            "4.7 kΩ, 5%", {"tol": "1%"}
+        )
+
+        assert resistance == Decimal("4700")
+        assert tolerance == "1%"
 
     def test_bare_unit_is_reported_as_invalid(self):
         plotter = ResistorStylePlotter()

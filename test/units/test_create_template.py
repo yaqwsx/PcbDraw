@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pcbdraw.create_template import extract_board_footprints
 from pcbdraw.kicad_sexpr import (
-    component_footprint_ids, normalize_embedded_footprint,
+    component_footprint_ids, component_properties, normalize_embedded_footprint,
     prepare_footprint_for_export,
 )
 
@@ -33,6 +33,28 @@ def test_board_footprint_ids_are_read_without_gencad_suffixes():
     board = Path("test/resources/ArduinoLearningKitStarter-v10.kicad_pcb").read_text()
     identifiers = component_footprint_ids(board)
     assert identifiers["C3"] == ("Capacitors_SMD", "C_1206_HandSoldering")
+
+
+def test_board_component_properties_are_indexed_by_reference():
+    board = '''(kicad_pcb
+      (footprint "Resistor_THT:R_Axial"
+        (property "Reference" "R1")
+        (property "Value" "12k3")
+        (property "ToL" "1%")
+        (property "Description" "precision resistor")))'''
+
+    assert component_properties(board) == {
+        "R1": {"tol": "1%", "description": "precision resistor"}
+    }
+
+
+def test_legacy_component_properties_use_fp_text_reference():
+    board = '''(kicad_pcb
+      (footprint "Resistor_THT:R_Axial"
+        (property "tol" "2%")
+        (fp_text reference "R2" (at 0 0) (layer "F.SilkS"))))'''
+
+    assert component_properties(board) == {"R2": {"tol": "2%"}}
 
 
 def test_extract_back_footprint_restores_library_orientation():

@@ -21,6 +21,7 @@ from .kicad_formats import (
     BoardData, DrillHole, parse_excellon, parse_gencad,
 )
 from .kicad_sexpr import component_footprint_ids, prepare_footprint_for_export
+from .kicad_sexpr import component_properties
 
 
 SUPPORTED_KICAD_MAJORS = (9, 10)
@@ -172,11 +173,22 @@ def _load_board_data_cached(
             executable=executable,
         )
         components, bounds = parse_gencad(gencad.read_text(encoding="utf-8"))
-        footprint_ids = component_footprint_ids(Path(path).read_text(encoding="utf-8"))
+        board_text = Path(path).read_text(encoding="utf-8")
+        footprint_ids = component_footprint_ids(board_text)
+        properties = component_properties(board_text)
         components = tuple(
-            replace(component, library=footprint_ids[component.reference][0],
-                    footprint=footprint_ids[component.reference][1])
-            if component.reference in footprint_ids else component
+            replace(
+                component,
+                library=footprint_ids.get(
+                    component.reference,
+                    (component.library, component.footprint),
+                )[0],
+                footprint=footprint_ids.get(
+                    component.reference,
+                    (component.library, component.footprint),
+                )[1],
+                properties=properties.get(component.reference, {}),
+            )
             for component in components
         )
 
