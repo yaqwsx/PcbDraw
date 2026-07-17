@@ -18,6 +18,7 @@ from mistune.plugins.footnotes import footnotes as plugin_footnotes
 from mistune.plugins.table import table as plugin_table
 from mistune.renderers.markdown import MarkdownRenderer
 
+from .component_references import expand_reference_ranges
 from .plot import find_data_file, get_global_datapaths
 
 PKG_BASE = os.path.dirname(__file__)
@@ -26,7 +27,7 @@ PKG_BASE = os.path.dirname(__file__)
 def parse_pcbdraw(inline: Any, m: re.Match[str], state: Any) -> int:
     text = m.group("pcbdraw_content")
     side, components = text.split("|")
-    components = [x.strip() for x in components.split(",")]
+    components = expand_reference_ranges(x.strip() for x in components.split(","))
     state.append_token({
         "type": "pcbdraw",
         "raw": text,
@@ -66,7 +67,7 @@ class _StepRendererMixin:
         self.items: List[Dict[str, Any]] = []
         self.current_item: Optional[Dict[str, Any]] = None
         self.active_side: str = "front"
-        self.visited_components: List[str] = list(initial_components)
+        self.visited_components = expand_reference_ranges(initial_components)
         self.active_components: List[str] = []
 
     def append_comment(self, html: str) -> None:

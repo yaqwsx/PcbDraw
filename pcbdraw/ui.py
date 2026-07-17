@@ -5,6 +5,7 @@ from typing import Tuple, Optional, Any, List
 import click
 
 from .click_utils import report_kicad_cli_errors
+from .component_references import expand_reference_ranges
 from .create_template import libtemplate
 
 from . import __version__
@@ -57,6 +58,15 @@ class CommaList(click.ParamType):
         values = [x.strip() for x in value.split(",")]
         return values
 
+
+class ComponentList(CommaList):
+    name = "Comma separated component list"
+
+    def convert(self, value: Any, param: Optional[click.Parameter],
+                ctx: Optional[click.Context]) -> List[str]:
+        return expand_reference_ranges(super().convert(value, param, ctx))
+
+
 @dataclass
 class WarningStderrReporter:
     silent: bool
@@ -88,10 +98,10 @@ class WarningStderrReporter:
     help="Specify which side of the PCB to render")
 @click.option("--mirror", is_flag=True,
     help="Mirror the board")
-@click.option("--highlight", type=CommaList(), default=[],
-    help="Comma separated list of components to highlight")
-@click.option("--filter", "-f", type=CommaList(), default=None,
-    help="Comma separated list of components to show, if not specified, show all")
+@click.option("--highlight", type=ComponentList(), default=[],
+    help="Comma separated components or ranges (for example R1-R5) to highlight")
+@click.option("--filter", "-f", type=ComponentList(), default=None,
+    help="Comma separated components or ranges to show; if omitted, show all")
 @click.option("--vcuts", "-v", type=KiCadLayerParam(), default=None,
     help="If layer specified, renders V-cuts from it")
 @click.option("--dpi", type=int, default=300,
@@ -104,8 +114,8 @@ class WarningStderrReporter:
     help="Treat warnings as errors")
 @click.option("--resistor-values", type=CommaList(), default=[],
     help="Comma separated list of resistor value remapping. For example, \"R1:10k,R2:470\"")
-@click.option("--resistor-flip", type=CommaList(), default=[],
-    help="Comma separated list of resistor bands to flip")
+@click.option("--resistor-flip", type=ComponentList(), default=[],
+    help="Comma separated resistors or ranges whose bands should be flipped")
 @click.option("--paste", is_flag=True,
     help="Add paste layer")
 @click.option("--components/--no-components", default=True,

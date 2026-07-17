@@ -104,6 +104,15 @@ class TestHtmlRenderer:
         assert "R2" in step2["components"]
         assert step2["active_components"] == ["R2"]
 
+    def test_component_ranges(self):
+        renderer = Renderer(mistune.HTMLRenderer, ["C1-C2"])
+        content = "[[front|R1-R3,D1]]\n\n- Populate components\n"
+        result = parse_content(renderer, content)
+        step = _steps(result)[0]["steps"][0]
+
+        assert step["components"] == ["C1", "C2", "R1", "R2", "R3", "D1"]
+        assert step["active_components"] == ["R1", "R2", "R3", "D1"]
+
 
 class TestMarkdownRenderer:
     def test_basic_step(self):
