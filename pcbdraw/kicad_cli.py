@@ -273,6 +273,7 @@ def export_pcb_svg_layers(board: str, layers: Iterable[str]) -> Dict[str, bytes]
 
 
 _ORIGIN_RADII = (0.123456, 0.234567)
+_SVG_ROUNDING_TOLERANCE = 0.0001
 
 
 def _marker_origin(content: bytes) -> Tuple[float, float]:
@@ -286,11 +287,11 @@ def _marker_origin(content: bytes) -> Tuple[float, float]:
             float(element.get("cy", "0")),
         ))
     for radius, x, y in circles:
-        if abs(radius - _ORIGIN_RADII[0]) > 0.00001:
+        if abs(radius - _ORIGIN_RADII[0]) > _SVG_ROUNDING_TOLERANCE:
             continue
-        if any(abs(other_radius - _ORIGIN_RADII[1]) < 0.00001
-               and abs(other_x - x) < 0.00001
-               and abs(other_y - y) < 0.00001
+        if any(abs(other_radius - _ORIGIN_RADII[1]) <= _SVG_ROUNDING_TOLERANCE
+               and abs(other_x - x) <= _SVG_ROUNDING_TOLERANCE
+               and abs(other_y - y) <= _SVG_ROUNDING_TOLERANCE
                for other_radius, other_x, other_y in circles):
             return x, y
     raise KiCadCliError("Cannot locate the footprint origin in kicad-cli output")

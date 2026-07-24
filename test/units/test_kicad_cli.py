@@ -106,6 +106,17 @@ def test_pcb_svg_export_avoids_v10_only_scale_option(monkeypatch, tmp_path):
     assert "--scale" not in commands[0]
 
 
+def test_marker_origin_accepts_kicad_9_rounded_radii():
+    svg = b"""
+        <svg>
+            <circle cx="9.2250" cy="23.2750" r="0.1235"/>
+            <circle cx="9.2250" cy="23.2750" r="0.2346"/>
+        </svg>
+    """
+
+    assert kicad_cli._marker_origin(svg) == (9.225, 23.275)
+
+
 def test_gencad_device_package_removes_exporter_shape_suffixes():
     suffixed = GENCAD.replace(
         'SHAPE "Resistor_SMD:R_0603" MIRRORX FLIP',
