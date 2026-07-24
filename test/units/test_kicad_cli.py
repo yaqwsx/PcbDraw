@@ -1,5 +1,6 @@
 import pytest
 
+import pcbdraw.kicad_cli as kicad_cli
 from pcbdraw.kicad_cli import canonical_layer
 from pcbdraw.kicad_formats import (
     BoardSide, Bounds, Point, Size, parse_excellon, parse_gencad,
@@ -83,6 +84,26 @@ def test_layer_parameter_accepts_official_names_and_legacy_numbers():
     assert parameter.convert("User.9", None, None) == "User.9"
     assert parameter.convert("In1.Cu", None, None) == "In1.Cu"
     assert parameter.convert("44", None, None) == "Edge.Cuts"
+
+
+def test_pcb_svg_export_avoids_v10_only_scale_option(monkeypatch, tmp_path):
+    commands = []
+
+    def fake_run(arguments, **kwargs):
+        commands.append(arguments)
+        output = arguments[arguments.index("-o") + 1]
+        (kicad_cli.Path(output) / "board-F_Cu.svg").write_bytes(b"<svg/>")
+        return b""
+
+    monkeypatch.setattr(kicad_cli, "_kicad_version", lambda executable: (9, 0, 9))
+    monkeypatch.setattr(kicad_cli, "run_kicad_cli", fake_run)
+
+    exported = kicad_cli._export_svg_layers(
+        "kicad-cli", str(tmp_path / "board.kicad_pcb"), 0, 0, ("F.Cu",),
+    )
+
+    assert exported == (("F.Cu", b"<svg/>"),)
+    assert "--scale" not in commands[0]
 
 
 def test_gencad_device_package_removes_exporter_shape_suffixes():

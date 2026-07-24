@@ -231,7 +231,6 @@ def _export_svg_layers(
             "--black-and-white",
             "--subtract-soldermask",
             "--drill-shape-opt", "0",
-            "--scale", "1",
             "-o", tmp,
             path,
         ], executable=executable)
