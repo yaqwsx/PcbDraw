@@ -85,6 +85,7 @@ class BoardScene:
     bounds: Bounds
     components: Mapping[str, ComponentAnnotation]
     pads: Mapping[Tuple[str, str], PadAnnotation]
+    source_path: str = ""
     tracks: Tuple[TrackAnnotation, ...] = ()
     zones: Tuple[ZoneAnnotation, ...] = ()
     vias: Tuple[ViaAnnotation, ...] = ()

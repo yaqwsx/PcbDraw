@@ -250,6 +250,12 @@ def parse_ipc2581(content: bytes, board: BoardData) -> BoardScene:
         components[reference] = ComponentAnnotation(reference, component.value, component.footprint,
             side, (component.position.x, component.position.y), component.rotation_degrees, bbox,
             tuple(sorted(component_pads[reference])))
-    return BoardScene(Bounds(board.bounds.x, board.bounds.y, board.bounds.width, board.bounds.height),
-        components, pads, tuple(tracks), tuple(zones), tuple(vias),
-        {name: tuple(values) for name, values in net_index.items()})
+    return BoardScene(
+        bounds=Bounds(board.bounds.x, board.bounds.y, board.bounds.width, board.bounds.height),
+        components=components,
+        pads=pads,
+        tracks=tuple(tracks),
+        zones=tuple(zones),
+        vias=tuple(vias),
+        nets={name: tuple(values) for name, values in net_index.items()},
+    )

@@ -13,7 +13,7 @@ pin_one = scene.pads[("J1", "1")]
 ground = list(scene.features_for_net("GND"))
 ```
 
-`BoardScene` contains components, pads, tracks, zones, vias, and an index of
+`BoardScene` contains the source path, components, pads, tracks, zones, vias, and an index of
 pads by net. Components are keyed by reference and pads by `(reference, name)`.
 Tracks are centre lines with widths; zones and pads are filled outlines. This
 distinction keeps the data useful to both vector renderers and interactive

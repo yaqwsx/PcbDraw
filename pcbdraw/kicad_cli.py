@@ -231,7 +231,7 @@ def _load_board_scene_cached(
         ], executable=executable)
         if not output.is_file():
             raise KiCadCliError("kicad-cli did not produce an IPC-2581 export")
-        return parse_ipc2581(output.read_bytes(), load_board_data(path))
+        return replace(parse_ipc2581(output.read_bytes(), load_board_data(path)), source_path=path)
 
 
 def load_board_scene(board: str) -> BoardScene:
