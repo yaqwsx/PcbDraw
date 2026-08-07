@@ -1,5 +1,6 @@
 """Integration tests for pcbdraw plot command. Requires KiCAD installation."""
 
+import ast
 import os
 import shutil
 import subprocess
@@ -243,7 +244,13 @@ def test_no_legacy_kicad_python_imports():
                 path = os.path.join(current, filename)
                 if path == __file__:
                     continue
-                content = open(path, encoding="utf-8").read()
-                if "import pcbnew" in content or "from pcbnew" in content:
+                tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
+                imports_pcbnew = any(
+                    (isinstance(node, ast.Import) and any(
+                        alias.name == "pcbnew" for alias in node.names)) or
+                    (isinstance(node, ast.ImportFrom) and node.module == "pcbnew")
+                    for node in ast.walk(tree)
+                )
+                if imports_pcbnew:
                     offenders.append(os.path.relpath(path, root))
     assert offenders == []
