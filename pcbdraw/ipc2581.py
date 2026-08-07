@@ -28,7 +28,10 @@ def _children(element: ET.Element, name: str) -> Iterable[ET.Element]:
 
 
 def _first(element: ET.Element, name: str) -> Optional[ET.Element]:
-    return next(_children(element, name), None)
+    for child in element:
+        if _tag(child) == name:
+            return child
+    return None
 
 
 def _first_of(element: ET.Element, names: Tuple[str, ...]) -> Optional[ET.Element]:
@@ -156,19 +159,20 @@ def _transform(outline: Tuple[Point, ...], location: Point, rotation: float) -> 
 def _component_boxes(step: ET.Element) -> Dict[str, Bounds]:
     packages = {}
     for package in _children(step, "Package"):
-        outline = _first(package, "Outline")
-        polygon = _first(outline, "Polygon") if outline is not None else None
+        package_outline = _first(package, "Outline")
+        polygon = _first(package_outline, "Polygon") if package_outline is not None else None
         if polygon is not None:
             packages[package.get("name", "")] = _polyline(polygon)
     result = {}
     for component in _children(step, "Component"):
-        location = _first(component, "Location")
-        if location is None:
+        location_element = _first(component, "Location")
+        if location_element is None:
             continue
         transform = _first(component, "Xform")
-        outline = packages.get(component.get("packageRef", ""), ())
+        component_outline = packages.get(component.get("packageRef", ""), ())
         result[component.get("refDes", "")] = _bounds(_transform(
-            outline, _point(location), _float(transform, "rotation") if transform is not None else 0))
+            component_outline, _point(location_element),
+            _float(transform, "rotation") if transform is not None else 0))
     return result
 
 
@@ -195,8 +199,8 @@ def parse_ipc2581(content: bytes, board: BoardData) -> BoardScene:
             net = feature_set.get("net") or None
             for pad in _children(feature_set, "Pad"):
                 pin = _first(pad, "PinRef")
-                location = _first(pad, "Location")
-                if pin is None or location is None:
+                location_element = _first(pad, "Location")
+                if pin is None or location_element is None:
                     continue
                 reference, name = pin.get("componentRef", ""), pin.get("pin", "")
                 if not reference or not name:
@@ -209,14 +213,15 @@ def parse_ipc2581(content: bytes, board: BoardData) -> BoardScene:
                 shape_id = primitive_ref.get("id") if primitive_ref is not None else None
                 if shape_id is None and stack:
                     shape_id = stack[0][1]
-                outline = _transform(primitives.get(shape_id or "", ()), _point(location), rotation)
+                pad_position = _point(location_element)
+                outline = _transform(primitives.get(shape_id or "", ()), pad_position, rotation)
                 if not outline:
                     continue
                 key = (reference, name)
                 existing = pads.get(key)
                 merged_layers = tuple(sorted(set((existing.layers if existing else ()) + layers)))
                 pads[key] = PadAnnotation(reference, name, net or (existing.net if existing else None),
-                    merged_layers, _point(location), outline, _bounds(outline),
+                    merged_layers, pad_position, outline, _bounds(outline),
                     bool(any(item[0] == "F.Cu" for item in stack) and any(item[0] == "B.Cu" for item in stack)))
             if not copper:
                 continue
@@ -234,18 +239,18 @@ def parse_ipc2581(content: bytes, board: BoardData) -> BoardScene:
                 for polygon in (item for item in features.iter() if _tag(item) == "Polygon"):
                     zones.append(ZoneAnnotation(net, layer, _polyline(polygon)))
             for hole in _children(feature_set, "Hole"):
-                location = _point(hole)
+                via_position = _point(hole)
                 stack = padstacks.get(feature_set.get("geometry", ""), ())
                 layers = tuple(sorted({item[0] for item in stack if item[0].endswith(".Cu")}))
                 diameter = max((_bounds(primitives.get(shape, ())).width for _, shape in stack), default=_float(hole, "diameter"))
-                vias.append(ViaAnnotation(net, layers, location, diameter, _float(hole, "diameter")))
+                vias.append(ViaAnnotation(net, layers, via_position, diameter, _float(hole, "diameter")))
 
     component_pads: Dict[str, List[str]] = defaultdict(list)
     net_index: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
-    for key, pad in pads.items():
-        component_pads[pad.component].append(pad.name)
-        if pad.net:
-            net_index[pad.net].append(key)
+    for key, pad_annotation in pads.items():
+        component_pads[pad_annotation.component].append(pad_annotation.name)
+        if pad_annotation.net:
+            net_index[pad_annotation.net].append(key)
     components = {}
     for reference, component in component_data.items():
         side = "back" if component.side == BoardSide.BACK else "front"
