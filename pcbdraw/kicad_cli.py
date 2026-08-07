@@ -22,6 +22,7 @@ from .kicad_formats import (
 )
 from .kicad_sexpr import component_footprint_ids, prepare_footprint_for_export
 from .kicad_sexpr import component_properties
+from .annotations import BoardScene
 
 
 SUPPORTED_KICAD_MAJORS = (9, 10)
@@ -211,6 +212,35 @@ def _load_board_data_cached(
 
 def load_board_data(board: str) -> BoardData:
     return _load_board_data_cached(*_board_cache_key(board))
+
+
+@lru_cache(maxsize=16)
+def _load_board_scene_cached(
+    executable: str, path: str, mtime_ns: int, size: int
+) -> BoardScene:
+    """Load reusable board annotations using only stable KiCad CLI exports."""
+    del mtime_ns, size
+    from .ipc2581 import parse_ipc2581
+
+    _kicad_version(executable)
+    with tempfile.TemporaryDirectory() as tmp:
+        output = Path(tmp) / "board.xml"
+        run_kicad_cli([
+            "pcb", "export", "ipc2581", "--units", "mm",
+            "--output", str(output), path,
+        ], executable=executable)
+        if not output.is_file():
+            raise KiCadCliError("kicad-cli did not produce an IPC-2581 export")
+        return parse_ipc2581(output.read_bytes(), load_board_data(path))
+
+
+def load_board_scene(board: str) -> BoardScene:
+    """Return components, pads, nets, tracks, zones and vias for ``board``.
+
+    The returned coordinates are millimetres in KiCad board space.  This API
+    intentionally does not require or import KiCad's ``pcbnew`` bindings.
+    """
+    return _load_board_scene_cached(*_board_cache_key(board))
 
 
 def _export_svg_layers(

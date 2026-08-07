@@ -7,7 +7,7 @@ import pytest
 from lxml import etree
 
 from pcbdraw.create_template import extract_board_footprints
-from pcbdraw.kicad_cli import export_footprint_svg
+from pcbdraw.kicad_cli import export_footprint_svg, load_board_scene
 
 
 def _has_kicad():
@@ -29,6 +29,7 @@ class TestPlotSVG:
         )
         assert result.returncode == 0, f"stderr: {result.stderr.decode()}"
         assert output.exists()
+        assert output.stat().st_size > 1000
         assert output.stat().st_size > 0
 
         # Structural SVG validation
@@ -148,7 +149,21 @@ class TestRender:
         )
         assert result.returncode == 0, f"stderr: {result.stderr.decode()}"
         assert output.exists()
-        assert output.stat().st_size > 1000
+
+
+@requires_kicad
+def test_board_scene_contains_electrical_annotations(board_path):
+    scene = load_board_scene(board_path)
+
+    assert scene.components
+    assert scene.pads
+    assert scene.nets
+    assert any(pad.net for pad in scene.pads.values())
+    assert any(track.net for track in scene.tracks)
+    assert scene.zones
+    assert scene.vias
+    assert all(pad.outline and pad.layers for pad in scene.pads.values())
+    assert all(component.bbox.width >= 0 for component in scene.components.values())
 
     def test_render_back(self, board_path, tmp_path):
         output = tmp_path / "render.png"
