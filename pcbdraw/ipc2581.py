@@ -31,6 +31,14 @@ def _first(element: ET.Element, name: str) -> Optional[ET.Element]:
     return next(_children(element, name), None)
 
 
+def _first_of(element: ET.Element, names: Tuple[str, ...]) -> Optional[ET.Element]:
+    for name in names:
+        item = _first(element, name)
+        if item is not None:
+            return item
+    return None
+
+
 def _float(element: ET.Element, name: str, default: float = 0) -> float:
     return float(element.get(name, str(default)))
 
@@ -111,7 +119,7 @@ def _padstack_layers(step: ET.Element) -> Dict[str, Tuple[Tuple[str, str], ...]]
     for definition in _children(step, "PadStackDef"):
         values = []
         for pad in _children(definition, "PadstackPadDef"):
-            ref = _first(pad, "StandardPrimitiveRef") or _first(pad, "UserPrimitiveRef")
+            ref = _first_of(pad, ("StandardPrimitiveRef", "UserPrimitiveRef"))
             if ref is not None and ref.get("id"):
                 values.append((pad.get("layerRef", ""), ref.get("id", "")))
         result[definition.get("name", "")] = tuple(values)
@@ -195,7 +203,7 @@ def parse_ipc2581(content: bytes, board: BoardData) -> BoardScene:
                     continue
                 transform = _first(pad, "Xform")
                 rotation = _float(transform, "rotation") if transform is not None else 0
-                primitive_ref = _first(pad, "StandardPrimitiveRef") or _first(pad, "UserPrimitiveRef")
+                primitive_ref = _first_of(pad, ("StandardPrimitiveRef", "UserPrimitiveRef"))
                 stack = padstacks.get(pad.get("padstackDefRef", ""), ())
                 layers = tuple(sorted({item[0] for item in stack if item[0].endswith(".Cu")}))
                 shape_id = primitive_ref.get("id") if primitive_ref is not None else None
