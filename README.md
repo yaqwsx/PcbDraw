@@ -35,6 +35,7 @@ There are two separate guides:
 - [usage of PcbDraw](doc/pcbdraw.md)
 - [usage of Populate](doc/populate.md)
 - [library management tools](doc/library.md)
+- [board annotations API](doc/annotations.md)
 
 There are also examples of usage in the `examples` directory.
 
