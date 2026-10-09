@@ -55,6 +55,17 @@ def test_legacy_component_properties_use_fp_text_reference():
         (fp_text reference "R2" (at 0 0) (layer "F.SilkS"))))'''
 
     assert component_properties(board) == {"R2": {"tol": "2%"}}
+    assert component_footprint_ids(board) == {"R2": ("Resistor_THT", "R_Axial")}
+
+
+def test_legacy_unquoted_reference_identifies_footprint():
+    board = '''(kicad_pcb
+      (footprint "Fiducial:Fiducial_1mm_Mask2mm"
+        (fp_text reference FID7 (at 0 0) (layer "F.SilkS"))))'''
+
+    assert component_footprint_ids(board) == {
+        "FID7": ("Fiducial", "Fiducial_1mm_Mask2mm")
+    }
 
 
 def test_extract_back_footprint_restores_library_orientation():

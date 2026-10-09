@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 
 _NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+_FORM_NAME_RE = re.compile(r"\s*([^\s()]+)")
 _AT_RE = re.compile(
     rf"\(at\s+({_NUMBER})\s+({_NUMBER})(?:\s+({_NUMBER}))?(\s+unlocked)?\)"
 )
@@ -34,7 +35,7 @@ def _forms_with_spans(document: str, form_name: str) -> List[Tuple[int, int]]:
         if character == '"':
             in_string = True
         elif character == "(":
-            match = re.match(r"\s*([^\s()]+)", document[index + 1:])
+            match = _FORM_NAME_RE.match(document, index + 1)
             stack.append((index, match.group(1) if match else None))
         elif character == ")" and stack:
             start, name = stack.pop()
@@ -156,6 +157,15 @@ def component_footprint_ids(document: str) -> Dict[str, Tuple[str, str]]:
             if property_match is not None:
                 reference = property_match.group(1)
                 break
+        if reference is None:
+            for text_form in top_level_forms(footprint, "fp_text"):
+                text_match = re.match(
+                    r'\(fp_text\s+reference\s+(?:"((?:\\.|[^"\\])*)"|([^\s()]+))',
+                    text_form,
+                )
+                if text_match is not None:
+                    reference = text_match.group(1) or text_match.group(2)
+                    break
         if reference is None:
             continue
         identifier = re.sub(r'\\(["\\])', r'\1', identifier_match.group(1))
